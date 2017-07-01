@@ -567,30 +567,38 @@ static int aw2013_led_probe(struct i2c_client *client,
 
 	mutex_init(&led_array->lock);
 
+	ret = aw2013_power_init(led_array, true);
+	if (ret) {
+		dev_err(&client->dev, "power init failed");
+		goto free_led_arry;
+	}
+
+	ret = aw2013_power_on(led_array, true);
+	if (ret) {
+		dev_err(&client->dev, "power on failed");
+		goto pwr_deinit;
+	}
+
 	ret = aw_2013_check_chipid(led_array);
 	if (ret) {
 		dev_err(&client->dev, "Check chip id error\n");
-		goto free_led_arry;
+		goto pwr_deinit;
 	}
 
 	ret = aw2013_led_parse_child_node(led_array, node);
 	if (ret) {
 		dev_err(&client->dev, "parsed node error\n");
-		goto free_led_arry;
+		goto pwr_deinit;
 	}
 
 	i2c_set_clientdata(client, led_array);
 
-	ret = aw2013_power_init(led_array, true);
-	if (ret) {
-		dev_err(&client->dev, "power init failed");
-		goto fail_parsed_node;
-	}
+	pr_info("aw2013 probe successfully\n");
 
 	return 0;
 
-fail_parsed_node:
-	aw2013_led_err_handle(led_array, num_leds);
+pwr_deinit:
+	aw2013_power_init(led_array, false);
 free_led_arry:
 	mutex_destroy(&led_array->lock);
 	devm_kfree(&client->dev, led_array);

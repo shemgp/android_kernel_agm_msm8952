@@ -31,6 +31,7 @@
 #include <soc/qcom/scm.h>
 #include <soc/qcom/restart.h>
 #include <soc/qcom/watchdog.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
@@ -42,6 +43,15 @@
 #define SCM_DLOAD_MODE			0X10
 #define SCM_EDLOAD_MODE			0X01
 #define SCM_DLOAD_CMD			0x10
+
+#define LK_ENABLE_DBG_FLAG		(0x4847<<16)
+
+extern void set_subsys_restart_level(int level);
+extern void hs_set_pm_pon_resin(int debug);
+static void set_dload_mode(int on);
+
+static int debug_flag;
+static struct delayed_work check_lk_flag_work;
 
 
 static int restart_mode;
@@ -77,6 +87,99 @@ static struct notifier_block panic_blk = {
 	.notifier_call	= panic_prep_restart,
 };
 
+static void hs_enable_debug(int value)
+{
+	if (0 == value) {
+		debug_flag = 0;
+		/* only restart subsystem */
+		set_subsys_restart_level(RESET_SUBSYS_COUPLED);
+	} else {
+		debug_flag = 1;
+		/* restart whole system */
+		set_subsys_restart_level(RESET_SOC);
+	}
+
+	hs_set_pm_pon_resin(debug_flag);
+	set_dload_mode(1);
+}
+
+static ssize_t debug_flag_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	int value;
+
+	if (sscanf(buf, "%d", &value) != 1) {
+		pr_err("debug_store: sscanf is wrong!\n");
+		return -EINVAL;
+	}
+	hs_enable_debug(value);
+
+	return len;
+}
+
+static ssize_t debug_flag_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", debug_flag);
+}
+
+static DEVICE_ATTR(debug_flag, S_IWUSR | S_IWGRP | S_IRUGO,
+		debug_flag_show, debug_flag_store);
+
+static struct attribute *msm_poweroff_attrs[] = {
+	&dev_attr_debug_flag.attr,
+	NULL,
+};
+
+static struct attribute_group msm_poweroff_attr_group = {
+	.attrs = msm_poweroff_attrs,
+};
+
+static void hs_debug_control_init(void)
+{
+	int ret;
+	struct kobject *debug_kobj;
+
+	debug_kobj = kobject_create_and_add("debug_control", NULL);
+	if (!debug_kobj) {
+		pr_err("hs_msm_poweroff_init: kobject create Failed!\n");
+		return;
+	}
+	ret = sysfs_create_group(debug_kobj, &msm_poweroff_attr_group);
+	if (ret < 0) {
+		pr_err("Error creating poweroff sysfs group\n");
+		return;
+	}
+
+	pr_info("hs_msm_poweroff_init: OK.\n");
+	return;
+}
+
+static void hs_check_lk_flag_work(struct work_struct *work)
+{
+	pr_info("hs_check_lk_flag_work enter\n");
+	hs_enable_debug(1);
+}
+
+static void hs_check_lk_flag(void)
+{
+	int read_data = 0;
+
+	if (dload_mode_addr) {
+		read_data = __raw_readl(dload_mode_addr + 2*sizeof(int));
+		if (LK_ENABLE_DBG_FLAG == (read_data & 0xffff0000)) {
+			pr_info("LK set debug enable.\n");
+			debug_flag = 1;
+			INIT_DELAYED_WORK(&check_lk_flag_work,
+				hs_check_lk_flag_work);
+			schedule_delayed_work(&check_lk_flag_work,
+				msecs_to_jiffies(5000));
+		}
+	}
+
+}
+
+
 int scm_set_dload_mode(int arg1, int arg2)
 {
 	struct scm_desc desc = {
@@ -105,7 +208,17 @@ static void set_dload_mode(int on)
 	int ret;
 
 	if (dload_mode_addr) {
-		__raw_writel(on ? 0xE47B337D : 0, dload_mode_addr);
+		if (restart_mode != RESTART_DLOAD) {
+			if (1 == debug_flag)
+				__raw_writel(on ? 0xE47B337D : 0,
+						dload_mode_addr);
+			else
+				__raw_writel(on ? 0xE47B337C : 0,
+						dload_mode_addr);
+		} else
+			__raw_writel(on ? 0xE47B337E : 0,
+					dload_mode_addr);
+
 		__raw_writel(on ? 0xCE14091A : 0,
 		       dload_mode_addr + sizeof(unsigned int));
 		mb();
@@ -235,6 +348,8 @@ static void msm_restart_prepare(const char *cmd)
 			((cmd != NULL && cmd[0] != '\0') &&
 			strcmp(cmd, "recovery") &&
 			strcmp(cmd, "bootloader") &&
+			strcmp(cmd, "hs-pwroff-chg") &&
+			strcmp(cmd, "hs-cts-test") &&
 			strcmp(cmd, "rtc")))
 			need_warm_reset = true;
 	} else {
@@ -242,13 +357,13 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
+
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (need_warm_reset) {
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	} else {
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 	}
-
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
@@ -271,11 +386,25 @@ static void msm_restart_prepare(const char *cmd)
 					     restart_reason);
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+		} else if (!strncmp(cmd, "forcedl", 7)) {
+			__raw_writel(0x776655bb, restart_reason);
+		} else if (!strncmp(cmd, "hs-pwroff-chg", 13)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_HS_PWROFF_CHG);
+			__raw_writel(0x77665512, restart_reason);
+		} else if (!strncmp(cmd, "hs-cts-test", 11)) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_HS_CTS_TEST);
+			__raw_writel(0x77665513, restart_reason);
+		} else if (!strncmp(cmd, "initlog", 7)) {
+			__raw_writel(0x77665514, restart_reason);
 		} else {
-			__raw_writel(0x77665501, restart_reason);
+			/*adb reboot save into pmic reg*/
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_HS_NORMAL_REBOOT);
+			qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 		}
 	}
-
 	flush_cache_all();
 
 	/*outer_flush_all is not supported by 64bit kernel*/
@@ -409,6 +538,9 @@ static int msm_restart_probe(struct platform_device *pdev)
 		if (!emergency_dload_mode_addr)
 			pr_err("unable to map imem EDLOAD mode offset\n");
 	}
+
+	hs_check_lk_flag();
+	hs_debug_control_init();
 
 #endif
 	np = of_find_compatible_node(NULL, NULL,

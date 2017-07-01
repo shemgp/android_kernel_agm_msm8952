@@ -221,6 +221,8 @@ static inline void smd_write_intr(unsigned int val, void __iomem *addr)
 	__raw_writel(val, addr);
 }
 
+extern int gic_suspend_flag;
+
 /**
  * smd_memcpy_to_fifo() - copy to SMD channel FIFO
  * @dest: Destination address
@@ -1447,6 +1449,23 @@ static void handle_smd_irq(struct remote_proc_info *r_info,
 				ch->half_ch->get_tail(ch->recv),
 				ch->half_ch->get_head(ch->recv)
 				);
+
+			if(gic_suspend_flag){
+				printk(
+				"SMD ch%d '%s' Data event 0x%x tx%d/rx%d %dr/%dw : %dr/%dw\n",
+				ch->n, ch->name,
+				ch_flags,
+				ch->fifo_size -
+					(smd_stream_write_avail(ch) + 1),
+				smd_stream_read_avail(ch),
+				ch->half_ch->get_tail(ch->send),
+				ch->half_ch->get_head(ch->send),
+				ch->half_ch->get_tail(ch->recv),
+				ch->half_ch->get_head(ch->recv)
+				);
+				gic_suspend_flag = 0;
+				}
+				
 			ch->notify(ch->priv, SMD_EVENT_DATA);
 		}
 		if (ch_flags & 0x4 && !state_change) {
@@ -1466,6 +1485,10 @@ static inline void log_irq(uint32_t subsystem)
 	(void) subsys;
 
 	SMD_POWER_INFO("SMD Int %s->Apps\n", subsys);
+
+	if(gic_suspend_flag)
+		printk("SMD Int %s->Apps\n", subsys);
+		
 }
 
 irqreturn_t smd_modem_irq_handler(int irq, void *data)

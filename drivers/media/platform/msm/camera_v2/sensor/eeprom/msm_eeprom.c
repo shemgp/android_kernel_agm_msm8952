@@ -14,6 +14,8 @@
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
+#include <linux/debugfs.h>
+
 #include "msm_sd.h"
 #include "msm_cci.h"
 #include "msm_eeprom.h"
@@ -25,6 +27,23 @@ DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 #ifdef CONFIG_COMPAT
 static struct v4l2_file_operations msm_eeprom_v4l2_subdev_fops;
 #endif
+
+
+#define OTP_STATE_SIZE  64
+typedef struct camera_otp_valid{
+	char otp_state[OTP_STATE_SIZE];
+}camera_otp_valid_t;
+
+
+static struct dentry *hsn_otp_dbg_node = NULL;
+
+static camera_otp_valid_t hsn_otp_valid[4];
+
+static char hsn_otp_dbg_buf[256];
+
+extern 	struct dentry *camera_dbg_root(void);
+
+
 /**
   * msm_eeprom_verify_sum - verify crc32 checksum
   * @mem:	data buffer
@@ -146,7 +165,7 @@ static int msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
 			sizeof(cdata->cfg.eeprom_name));
 		break;
 	case CFG_EEPROM_GET_CAL_DATA:
-		CDBG("%s E CFG_EEPROM_GET_CAL_DATA\n", __func__);
+		CDBG("%s E CFG_EEPROM_GET_CAL_DATA num_bytes=%d\n", __func__, e_ctrl->cal_data.num_data);
 		cdata->cfg.get_data.num_bytes =
 			e_ctrl->cal_data.num_data;
 		break;
@@ -867,7 +886,7 @@ static int msm_eeprom_config32(struct msm_eeprom_ctrl_t *e_ctrl,
 			sizeof(cdata->cfg.eeprom_name));
 		break;
 	case CFG_EEPROM_GET_CAL_DATA:
-		CDBG("%s E CFG_EEPROM_GET_CAL_DATA\n", __func__);
+		CDBG("%s E CFG_EEPROM_GET_CAL_DATA num_bytes=%d\n", __func__, e_ctrl->cal_data.num_data);
 		cdata->cfg.get_data.num_bytes =
 			e_ctrl->cal_data.num_data;
 		break;
@@ -920,6 +939,115 @@ static long msm_eeprom_subdev_fops_ioctl32(struct file *file, unsigned int cmd,
 
 #endif
 
+
+
+
+static int eeprom_dbg_open(struct inode *inode, struct file *filp)
+{
+	CDBG("%s Enter.\n", __func__);
+	filp->private_data = inode->i_private;
+	return 0;
+}
+
+
+
+static ssize_t eeprom_dbg_read(struct file *filp, char __user *buffer,
+	size_t count, loff_t *ppos)
+{
+	int i, otp_num, len;
+	int offset = 0;
+
+	CDBG("%s Enter. cnt=%d *ppos=%lld\n", __func__, (int)count, (*ppos));
+
+	if(*ppos > 0){
+		*ppos = 0;
+		return 0;
+	}
+
+	otp_num = sizeof(hsn_otp_valid)/sizeof(hsn_otp_valid[0]);
+	memset(hsn_otp_dbg_buf, 0, sizeof(hsn_otp_dbg_buf));
+	
+	for(i = 0; i < otp_num; i++){
+
+		CDBG("hsn_otp_valid[%d] %s\n", i, hsn_otp_valid[i].otp_state);
+		
+		if(strlen(hsn_otp_valid[i].otp_state) > 0){
+			len = sprintf(hsn_otp_dbg_buf + offset, "%s;", hsn_otp_valid[i].otp_state);
+			offset += len;
+		}
+	}
+	
+	if (copy_to_user(buffer, hsn_otp_dbg_buf, offset))
+		return -EFAULT;
+
+	*ppos += offset;
+
+	CDBG("%s Exit.\n", __func__);
+	return offset;
+}
+
+
+static ssize_t eeprom_dbg_write(struct file *filp, const char __user *buffer,
+size_t count, loff_t *ppos)
+{
+	int i, otp_num;
+	
+	CDBG("%s Enter. cnt=%d *ppos=%lld", __func__, (int)count, (*ppos));
+	
+	if (*ppos >= OTP_STATE_SIZE)
+		return 0;
+	if (*ppos + count > OTP_STATE_SIZE)
+		count = OTP_STATE_SIZE - *ppos;
+
+	memset(hsn_otp_dbg_buf, 0, sizeof(hsn_otp_dbg_buf));
+	if (copy_from_user(hsn_otp_dbg_buf, buffer, count))
+		return -EFAULT;
+
+	otp_num = sizeof(hsn_otp_valid)/sizeof(hsn_otp_valid[0]);
+	for(i = 0; i < otp_num; i++){
+		
+		CDBG("hsn_otp_valid[%d] %s\n", i, hsn_otp_valid[i].otp_state);
+		if( !strncmp(hsn_otp_dbg_buf, hsn_otp_valid[i].otp_state, 5) 
+			|| !strlen(hsn_otp_valid[i].otp_state)){
+			break;
+		}
+	}
+	if(i >= otp_num){
+		CDBG("hsn_otp_valid[%d] overflow.\n", i);
+		return -EFAULT;
+	}
+	
+	memset(hsn_otp_valid[i].otp_state, 0, sizeof(hsn_otp_valid[i].otp_state));	
+	strncpy(hsn_otp_valid[i].otp_state, hsn_otp_dbg_buf, OTP_STATE_SIZE - 1);
+	
+	*ppos = 0;
+	
+	CDBG("%s Exit. \n", __func__);
+
+	return count;
+}
+
+
+
+
+
+
+
+static struct file_operations eeprom_debug_fops = {
+.owner = THIS_MODULE,
+.open = eeprom_dbg_open,
+.read = eeprom_dbg_read,
+.write = eeprom_dbg_write,
+};
+
+
+
+
+
+
+
+
+
 static int msm_eeprom_platform_probe(struct platform_device *pdev)
 {
 	int rc = 0;
@@ -931,6 +1059,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	struct msm_eeprom_board_info *eb_info = NULL;
 	struct device_node *of_node = pdev->dev.of_node;
 	struct msm_camera_power_ctrl_t *power_info = NULL;
+	struct dentry *cam_dbg_root = NULL;
 
 	CDBG("%s E\n", __func__);
 
@@ -975,9 +1104,9 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 		&e_ctrl->i2c_freq_mode);
 	CDBG("qcom,i2c_freq_mode %d, rc %d\n", e_ctrl->i2c_freq_mode, rc);
 	if (rc < 0) {
-		pr_err("%s qcom,i2c-freq-mode read fail. Setting to 0 %d\n",
+		pr_err("%s qcom,i2c-freq-mode read fail. Setting to I2C_FAST_MODE %d\n",
 			__func__, rc);
-		e_ctrl->i2c_freq_mode = 0;
+		e_ctrl->i2c_freq_mode = I2C_FAST_MODE;
 	}
 
 	if (e_ctrl->i2c_freq_mode >= I2C_MAX_MODES) {
@@ -1016,8 +1145,8 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	rc = of_property_read_u32(of_node, "qcom,i2c-freq-mode",
 		&eb_info->i2c_freq_mode);
 	if (rc < 0 || (eb_info->i2c_freq_mode >= I2C_MAX_MODES)) {
-		eb_info->i2c_freq_mode = I2C_STANDARD_MODE;
-		CDBG("%s Default I2C standard speed mode.\n", __func__);
+		eb_info->i2c_freq_mode = I2C_FAST_MODE;
+		CDBG("%s Default I2C fast speed mode.\n", __func__);
 	}
 
 	CDBG("qcom,slave-addr = 0x%X\n", eb_info->i2c_slaveaddr);
@@ -1061,12 +1190,33 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	if (rc < 0) {
 		pr_err("%s read_eeprom_memory failed\n", __func__);
 		goto power_down;
+	}else{
+		CDBG("read_eeprom_memory: data_size = %d\n", e_ctrl->cal_data.num_data);
 	}
+	
 	for (j = 0; j < e_ctrl->cal_data.num_data; j++)
-		CDBG("memory_data[%d] = 0x%X\n", j,
-			e_ctrl->cal_data.mapdata[j]);
+		CDBG("memory_data[%d] = 0x%X\n", j,	e_ctrl->cal_data.mapdata[j]);
 
-	e_ctrl->is_supported |= msm_eeprom_match_crc(&e_ctrl->cal_data);
+
+	cam_dbg_root = camera_dbg_root();
+	if(cam_dbg_root){
+		if(!hsn_otp_dbg_node){
+			memset(hsn_otp_valid, 0, sizeof(hsn_otp_valid));			
+			hsn_otp_dbg_node = debugfs_create_file("otp_state", 0777, cam_dbg_root, NULL, &eeprom_debug_fops);
+			if(!hsn_otp_dbg_node){
+				pr_err("%s:%d debugfs_create_file otp_valid fail!\n", __func__, __LINE__);
+			}
+		}
+	}
+	
+	/**Qcom's crc not adapt all sensor, so no use it. So delt by hisense.*/
+#if 0
+	crc =  msm_eeprom_match_crc(&e_ctrl->cal_data);
+	e_ctrl->is_supported |= crc;
+	CDBG("%s is_supported=%d crc=%d -> 1\n", __func__, e_ctrl->is_supported, crc);
+#else
+	e_ctrl->is_supported = 1;
+#endif
 
 	rc = msm_camera_power_down(power_info, e_ctrl->eeprom_device_type,
 		&e_ctrl->i2c_client);
@@ -1354,6 +1504,8 @@ static struct spi_driver msm_eeprom_spi_driver = {
 	.probe = msm_eeprom_spi_probe,
 	.remove = msm_eeprom_spi_remove,
 };
+
+
 
 static int __init msm_eeprom_init_module(void)
 {

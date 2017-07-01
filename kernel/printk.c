@@ -1410,6 +1410,92 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 	return len;
 }
 
+#ifdef CONFIG_RS_RECORDER_SUPPORT
+int rs_recorder_get_dmesg(char *buf, int size)
+{
+	int len = 0;
+	u64 cur_clear_seq;
+	u32 cur_clear_idx;
+	u64 rs_next_seq;
+	u32 rs_next_idx;
+
+	if (!raw_spin_trylock_irq(&logbuf_lock))
+		return 0;
+
+	cur_clear_seq = clear_seq;
+	cur_clear_idx = clear_idx;
+	rs_next_seq = log_next_seq;
+	rs_next_idx = log_next_idx;
+
+	if (buf) {
+		u64 next_seq;
+		u64 seq;
+		u32 idx;
+		enum log_flags prev;
+
+		if (cur_clear_seq < log_first_seq) {
+			/* messages are gone, move to first available one */
+			cur_clear_seq = log_first_seq;
+			cur_clear_idx = log_first_idx;
+		}
+
+		/*
+		 * Find first record that fits, including all following records,
+		 * into the user-provided buffer for this dump.
+		 */
+		seq = cur_clear_seq;
+		idx = cur_clear_idx;
+		prev = 0;
+		while (seq < rs_next_seq) {
+			struct log *msg = log_from_idx(idx, true);
+
+			len += msg_print_text(msg, prev, true, NULL, 0);
+			prev = msg->flags;
+			idx = log_next(idx, true);
+			seq++;
+		}
+
+		/* move first record forward until length fits into the buffer */
+		seq = cur_clear_seq;
+		idx = cur_clear_idx;
+		prev = 0;
+		while (len > size && seq < rs_next_seq) {
+			struct log *msg = log_from_idx(idx, true);
+
+			len -= msg_print_text(msg, prev, true, NULL, 0);
+			prev = msg->flags;
+			idx = log_next(idx, true);
+			seq++;
+		}
+
+		/* last message fitting into this dump */
+		next_seq = rs_next_seq;
+
+		len = 0;
+		prev = 0;
+		while (len >= 0 && seq < next_seq) {
+			struct log *msg = log_from_idx(idx, true);
+
+			len += msg_print_text(msg, prev, true, buf + len,
+					size - len);
+			idx = log_next(idx, true);
+			seq++;
+			prev = msg->flags;
+
+			if (seq < log_first_seq) {
+				/* messages are gone, move to next one */
+				seq = log_first_seq;
+				idx = log_first_idx;
+				prev = 0;
+			}
+		}
+	}
+	raw_spin_unlock_irq(&logbuf_lock);
+
+	return len;
+}
+#endif
+
 int do_syslog(int type, char __user *buf, int len, bool from_file)
 {
 	bool clear = false;

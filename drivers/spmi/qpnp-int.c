@@ -76,6 +76,7 @@ struct q_chip_data {
 static LIST_HEAD(qpnpint_chips);
 static DEFINE_MUTEX(qpnpint_chips_mutex);
 
+
 #define QPNPINT_MAX_BUSSES 4
 struct q_chip_data *chip_lookup[QPNPINT_MAX_BUSSES];
 
@@ -594,6 +595,7 @@ int qpnpint_unregister_controller(struct device_node *node)
 }
 EXPORT_SYMBOL(qpnpint_unregister_controller);
 
+
 static int __qpnpint_handle_irq(struct spmi_controller *spmi_ctrl,
 		       struct qpnp_irq_spec *spec,
 		       bool show)
@@ -631,7 +633,8 @@ static int __qpnpint_handle_irq(struct spmi_controller *spmi_ctrl,
 		else if (desc->action && desc->action->name)
 			name = desc->action->name;
 
-		pr_warn("%d triggered [0x%01x, 0x%02x,0x%01x] %s\n",
+		/* default show resume trigger source */
+		printk("%d triggered [0x%01x, 0x%02x,0x%01x] %s\n",
 				irq, spec->slave, spec->per, spec->irq, name);
 	} else {
 		generic_handle_irq(irq);

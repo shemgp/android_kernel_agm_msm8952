@@ -170,6 +170,10 @@
 		gdsc-supply = <&gdsc_mdss>;
 		vdda-supply = <&pm8950_l2>;
 		vddio-supply = <&pm8950_l6>;
+	/*remove it for pmi remove scheme hisense*/	
+	/*	lab-supply = <&lab_regulator>;
+        ibb-supply = <&ibb_regulator>;
+	*/
 		ranges = <0x1a98000 0x1a98000 0x25c
 		      0x1a98500 0x1a98500 0x280
 		      0x1a98780 0x1a98780 0x30
@@ -241,8 +245,10 @@
 			qcom,mdss-mdp = <&mdss_mdp>;
 			vdd-supply = <&pm8950_l17>;
 			vddio-supply = <&pm8950_l6>;
-			lab-supply = <&lab_regulator>;
-			ibb-supply = <&ibb_regulator>;
+			/*remove it for pmi remove scheme hisense*/	
+			/*	lab-supply = <&lab_regulator>;
+				ibb-supply = <&ibb_regulator>;
+			*/
 
 			clocks = <&clock_gcc_mdss clk_gcc_mdss_byte0_clk>,
 				<&clock_gcc_mdss clk_gcc_mdss_pclk0_clk>,
@@ -269,4 +275,4 @@
 	};
 };
 
-#include "msm8952-mdss-panels.dtsi"
+/*#include "msm8952-mdss-panels.dtsi"*/

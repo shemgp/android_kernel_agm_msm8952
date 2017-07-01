@@ -173,6 +173,8 @@ struct wcd_mbhc {
 
 	wait_queue_head_t wait_btn_press;
 	bool is_btn_press;
+	/*Hisense add*/
+	bool is_hs_inserted;
 	u8 current_plug;
 	bool in_swch_irq_handler;
 	bool hphl_swh; /*track HPHL switch NC / NO */
@@ -278,4 +280,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 int wcd_mbhc_get_impedance(struct wcd_mbhc *mbhc, uint32_t *zl,
 			   uint32_t *zr);
 void wcd_mbhc_deinit(struct wcd_mbhc *mbhc);
+
+extern bool is_session_playback;
+
 #endif /* __WCD_MBHC_V2_H__ */

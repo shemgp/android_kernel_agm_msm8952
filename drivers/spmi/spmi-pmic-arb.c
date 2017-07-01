@@ -959,6 +959,7 @@ static irqreturn_t pmic_arb_periph_irq(int irq, void *dev_id)
 	return __pmic_arb_periph_irq(irq, dev_id, false);
 }
 
+
 static void spmi_pmic_arb_resume(void)
 {
 	if (qpnpint_show_resume_irq())

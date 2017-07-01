@@ -20,11 +20,14 @@
 #include <linux/mmc/mmc.h>
 #include <linux/pm_runtime.h>
 #include <linux/reboot.h>
+#include <linux/productinfo.h>
+#include <linux/hisresume.h>
 
 #include "core.h"
 #include "bus.h"
 #include "mmc_ops.h"
 #include "sd_ops.h"
+
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -74,6 +77,8 @@ static const struct mmc_fixup mmc_fixups[] = {
 /*
  * Given the decoded CSD structure, decode the raw CID to our CID structure.
  */
+/* resolve hynix emmc awake too long time:600+ms, turn ldo8 always on */
+bool emmc_vcc_need_on = 0;
 static int mmc_decode_cid(struct mmc_card *card)
 {
 	u32 *resp = card->raw_cid;
@@ -121,6 +126,18 @@ static int mmc_decode_cid(struct mmc_card *card)
 		pr_err("%s: card has unknown MMCA version %d\n",
 			mmc_hostname(card->host), card->csd.mmca_vsn);
 		return -EINVAL;
+	}
+
+	if (!card->host->index) {
+
+		/* resolve hynix emmc awake too long time:600+ms,
+		 * turn ldo8 always on, start
+		 */
+		if (card->cid.manfid == CID_MANFID_HYNIX)
+			emmc_vcc_need_on = 1;
+		/* resolve hynix emmc awake too long time:600+ms,
+		 * turn ldo8 always on, end
+		 */
 	}
 
 	return 0;
@@ -286,6 +303,7 @@ static void mmc_select_card_type(struct mmc_card *card)
 	card->ext_csd.hs_max_dtr = hs_max_dtr;
 	card->ext_csd.card_type = card_type;
 }
+
 
 /*
  * Decode extended CSD.
@@ -621,7 +639,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.cmdq_support = 0;
 		card->ext_csd.cmdq_depth = 0;
 	}
-
 out:
 	return err;
 }
@@ -1917,6 +1934,8 @@ static int mmc_suspend(struct mmc_host *host)
 
 	if (!mmc_try_claim_host(host))
 		return -EBUSY;
+	pr_info("%s: %s: %d start\n", mmc_hostname(host), __func__, __LINE__);
+	suspendinfo_start(S_A_EMMC_ID);
 
 	err = mmc_cache_ctrl(host, 0);
 	if (err)
@@ -1927,6 +1946,8 @@ static int mmc_suspend(struct mmc_host *host)
 	else if (!mmc_host_is_spi(host))
 		err = mmc_deselect_cards(host);
 	host->card->state &= ~(MMC_STATE_HIGHSPEED | MMC_STATE_HIGHSPEED_200);
+	pr_info("%s: %s: %d end\n", mmc_hostname(host), __func__, __LINE__);
+	suspendinfo_end(S_A_EMMC_ID);
 
 out:
 	mmc_release_host(host);
@@ -1946,6 +1967,10 @@ static int mmc_resume(struct mmc_host *host)
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
+
+	pr_info("%s: %s: %d start\n", mmc_hostname(host), __func__, __LINE__);
+	resumeinfo_start(S_A_EMMC_ID);
+
 
 	mmc_claim_host(host);
 	retries = 3;
@@ -1972,6 +1997,8 @@ static int mmc_resume(struct mmc_host *host)
 	 */
 	if (mmc_can_scale_clk(host))
 		mmc_init_clk_scaling(host);
+	pr_info("%s: %s: %d end\n", mmc_hostname(host), __func__, __LINE__);
+	resumeinfo_end(S_A_EMMC_ID);
 
 	return err;
 }

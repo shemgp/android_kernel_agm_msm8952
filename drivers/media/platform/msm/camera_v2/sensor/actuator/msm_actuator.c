@@ -1103,6 +1103,7 @@ static int32_t msm_actuator_set_position(
 	}
 
 	a_ctrl->i2c_tbl_index = 0;
+	hw_params = set_pos->hw_params;//qualcomm bug modified by hisense 16.03.08
 	for (index = 0; index < set_pos->number_of_steps; index++) {
 		next_lens_position = set_pos->pos[index];
 		delay = set_pos->delay[index];
@@ -1951,7 +1952,12 @@ static struct msm_actuator msm_vcm_actuator_table = {
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_parse_i2c_params = msm_actuator_parse_i2c_params,
 		.actuator_set_position = msm_actuator_set_position,
+/*****add by hisense  2016.03.11********/
+  #ifdef CONFIG_HIS_BI_ACTUATOR
+        .actuator_park_lens = NULL,
+  #else
 		.actuator_park_lens = msm_actuator_park_lens,
+  #endif
 	},
 };
 

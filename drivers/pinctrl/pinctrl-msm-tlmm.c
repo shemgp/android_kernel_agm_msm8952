@@ -161,6 +161,12 @@
 #define TLMM_GP_INTR_STATUS(pi, pin)	(pi->reg_base + 0x0c + \
 					 pi->pintype_data->gp_reg_size * (pin))
 
+#define TLMMV4_GP_CFG(base, pin)        (base + 0x0 + 0x1000 * (pin))
+#define TLMMV4_GP_INOUT(base, pin)      (base + 0x4 + 0x1000 * (pin))
+#define TLMMV4_GP_INTR_CFG(base, pin)		(base + 0x8 + 0x1000 * (pin))
+#define TLMMV4_GP_INTR_STATUS(base, pin)	(base + 0xc + 0x1000 * (pin))
+
+
 /* QDSD Pin type register offsets */
 #define TLMMV_QDSD_PULL_MASK			0x3
 #define TLMMV4_QDSD_PULL_OFFSET			0x3
@@ -252,6 +258,9 @@ static const struct msm_sdc_regs sdc_regs[MSM_PINTYPE_SDC_REGS_MAX] = {
 	},
 
 };
+
+/* used to operate gpio by hisense */
+static  void __iomem *gpio_register_base;
 
 static int msm_tlmm_sdc_cfg(uint pin_no, unsigned long *config,
 			    bool write, const struct msm_pintype_info *pinfo)
@@ -949,6 +958,7 @@ static int msm_tlmm_gp_irq_suspend(void)
 	return 0;
 }
 
+
 static void msm_tlmm_gp_irq_resume(void)
 {
 	unsigned long irq_flags;
@@ -1183,6 +1193,10 @@ static int msm_tlmm_probe(struct platform_device *pdev)
 							resource_size(res));
 	if (IS_ERR(tlmm_desc->base))
 		return PTR_ERR(tlmm_desc->base);
+	/* save to operate gpio by hisense */
+	gpio_register_base = tlmm_desc->base;
+	//printk("%s: gpio_register_base=%x\n", __func__, (unsigned int)gpio_register_base);
+
 	tlmm_desc->irq = -EINVAL;
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (res) {
@@ -1213,6 +1227,7 @@ static struct platform_driver msm_tlmm_drv = {
 		.of_match_table = of_match_ptr(msm_tlmm_dt_match),
 	},
 };
+
 
 static int __init msm_tlmm_drv_register(void)
 {

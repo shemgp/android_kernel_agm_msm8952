@@ -97,6 +97,7 @@ static int mmc_host_runtime_suspend(struct device *dev)
 	return ret;
 }
 
+
 static int mmc_host_runtime_resume(struct device *dev)
 {
 	struct mmc_host *host = cls_dev_to_mmc_host(dev);
@@ -105,6 +106,7 @@ static int mmc_host_runtime_resume(struct device *dev)
 
 	if (!mmc_use_core_runtime_pm(host))
 		return 0;
+
 
 	ret = mmc_resume_host(host);
 	if (ret < 0) {
@@ -206,6 +208,8 @@ static int mmc_host_resume(struct device *dev)
 		}
 	}
 	host->dev_status = DEV_RESUMED;
+	
+
 	return ret;
 }
 #endif
@@ -653,6 +657,11 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	wake_lock_init(&host->detect_wake_lock, WAKE_LOCK_SUSPEND,
 			host->wlock_name);
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+	if(host->index == 1)
+	{
+		wake_lock_init(&host->sd_wake_lock, WAKE_LOCK_SUSPEND,
+			"sd_detect");
+	}
 #ifdef CONFIG_PM
 	host->pm_notify.notifier_call = mmc_pm_notify;
 #endif
@@ -1009,6 +1018,8 @@ void mmc_free_host(struct mmc_host *host)
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);
 	wake_lock_destroy(&host->detect_wake_lock);
+	if(host->index ==1)
+		wake_lock_destroy(&host->sd_wake_lock);
 
 	put_device(&host->class_dev);
 }

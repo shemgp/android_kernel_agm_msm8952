@@ -50,6 +50,9 @@ int alarm_try_to_cancel(struct alarm *alarm);
 int alarm_cancel(struct alarm *alarm);
 void set_power_on_alarm(long secs, bool enable);
 void power_on_alarm_init(void);
+int alarm_suspend_or_resume(void);
+void alarm_set_suspend_flag(int input);
+
 
 u64 alarm_forward(struct alarm *alarm, ktime_t now, ktime_t interval);
 u64 alarm_forward_now(struct alarm *alarm, ktime_t interval);

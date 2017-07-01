@@ -20,6 +20,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 #include <linux/pm_runtime.h>
+#include <linux/hisresume.h>
 
 #include "core.h"
 #include "bus.h"
@@ -72,6 +73,7 @@ static const unsigned int sd_au_size[] = {
 			__res |= resp[__off-1] << ((32 - __shft) % 32);	\
 		__res & __mask;						\
 	})
+
 
 /*
  * Given the decoded CSD structure, decode the raw CID to our CID structure.
@@ -1218,6 +1220,7 @@ static int mmc_sd_suspend(struct mmc_host *host)
 	host->card->state &= ~MMC_STATE_HIGHSPEED;
 	mmc_release_host(host);
 
+	suspendinfo_end(S_A_TFCARD_ID);
 	return err;
 }
 
@@ -1234,8 +1237,11 @@ static int mmc_sd_resume(struct mmc_host *host)
 	int retries;
 #endif
 
+
 	BUG_ON(!host);
 	BUG_ON(!host->card);
+
+	resumeinfo_start(S_A_TFCARD_ID);
 
 	mmc_claim_host(host);
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
@@ -1266,6 +1272,9 @@ static int mmc_sd_resume(struct mmc_host *host)
 	 */
 	if (mmc_can_scale_clk(host))
 		mmc_init_clk_scaling(host);
+	
+	resumeinfo_end(S_A_TFCARD_ID);
+
 
 	return err;
 }
@@ -1437,6 +1446,7 @@ err:
 	if (err)
 		pr_err("%s: error %d whilst initialising SD card: rescan: %d\n",
 		       mmc_hostname(host), err, host->rescan_disable);
+
 
 	return err;
 }

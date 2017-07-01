@@ -79,6 +79,7 @@ static struct notifier_block __refdata lpm_wa_nblk = {
 static void process_lpm_workarounds(struct work_struct *w)
 {
 	int ret = 0, status = 0;
+	int cpu = 0;
 
 	/* MSM8952 have L1/L2 dynamic clock gating disabled in HW for
 	 * performance cluster cores. Enable it via SW to reduce power
@@ -101,8 +102,10 @@ static void process_lpm_workarounds(struct work_struct *w)
 		}
 
 		l2_status = __raw_readl(l2_pwr_sts);
+		cpu = get_cpu();
+		put_cpu();
 		pr_err("Set L1_L2_GCC from cpu%d when perf L2 status=0x%x\n",
-			smp_processor_id(), l2_status);
+			cpu, l2_status);
 
 		if (is_l1_l2_gcc_secure) {
 			scm_io_write((u32)(l1_l2_gcc_res->start), 0x0);

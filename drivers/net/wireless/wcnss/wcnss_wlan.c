@@ -43,6 +43,10 @@
 
 #include <soc/qcom/smd.h>
 
+/*start from Hisense*/
+#include <linux/productinfo.h>
+#include <linux/proc_fs.h>
+/*end from Hisense*/
 #define DEVICE "wcnss_wlan"
 #define CTRL_DEVICE "wcnss_ctrl"
 #define VERSION "1.01"
@@ -180,6 +184,13 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define WCNSS_MIN_CMD_LEN		(3)
 #define WCNSS_MIN_SERIAL_LEN		(6)
 
+/*start from Hisense*/
+#define WLAN_VERSION_LEN    120
+
+/*end from Hisense*/
+//add for postel test
+#define WLAN_FTM_LEN    80
+//add for postel test
 /* control messages from userspace */
 #define WCNSS_USR_CTRL_MSG_START  0x00000000
 #define WCNSS_USR_SERIAL_NUM      (WCNSS_USR_CTRL_MSG_START + 1)
@@ -427,6 +438,80 @@ static struct {
 	struct delayed_work wcnss_pm_qos_del_req;
 	struct mutex pm_qos_mutex;
 } *penv = NULL;
+/*start from Hisense*/
+struct proc_dir_entry *proc_wlan_version;
+char wlan_version[WLAN_VERSION_LEN];
+
+static void wlan_register_productinfo(void)
+{
+    memset(wlan_version,0,sizeof(wlan_version));
+    snprintf(wlan_version,WLAN_VERSION_LEN,"please open Wi-Fi first.");
+
+}
+static int wlan_version_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%s\n", wlan_version);
+
+	return 0;
+}
+
+static int wlan_version_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, wlan_version_show, NULL);
+}
+
+static const struct file_operations wlan_version_proc_fops = {
+	.open		= wlan_version_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+void init_wlan_proc(void)
+{
+	proc_wlan_version = proc_create("wlan_version", 0644, NULL, &wlan_version_proc_fops);
+	if(proc_wlan_version == NULL)
+	{
+		printk("Could not create proc entry wlan_version\n");
+	}
+
+}
+EXPORT_SYMBOL_GPL(wlan_version);
+/*end from Hisense*/
+
+//add for postel test start
+struct proc_dir_entry *proc_wlan_ftm;
+char wlan_ftm[WLAN_FTM_LEN];
+static int wlan_ftm_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%s\n", wlan_ftm);
+
+	return 0;
+}
+
+static int wlan_ftm_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, wlan_ftm_show, NULL);
+}
+
+static const struct file_operations wlan_ftm_proc_fops = {
+	.open		= wlan_ftm_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+void init_wlan_ftm_proc(void)
+{
+	proc_wlan_ftm = proc_create("wlan_ftm", 0644, NULL, &wlan_ftm_proc_fops);
+	if(proc_wlan_ftm == NULL)
+	{
+		printk("Could not create proc entry wlan_ftm\n");
+	}
+
+}
+EXPORT_SYMBOL_GPL(wlan_ftm);
+//add for postel test end
 
 static ssize_t wcnss_wlan_macaddr_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -3508,6 +3593,13 @@ static int __init wcnss_wlan_init(void)
 	platform_driver_register(&wcnss_ctrl_driver);
 	register_pm_notifier(&wcnss_pm_notifier);
 
+/*start from Hisense*/
+  wlan_register_productinfo();
+  init_wlan_proc();
+/*end from Hisense*/
+
+//sunzizhi add for postel test
+	init_wlan_ftm_proc();
 	return 0;
 }
 

@@ -15,7 +15,8 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-int msm_show_resume_irq_mask;
+/* default show wake up source */
+int msm_show_resume_irq_mask = 1;
 
 module_param_named(
 	debug_mask, msm_show_resume_irq_mask, int, S_IRUGO | S_IWUSR | S_IWGRP

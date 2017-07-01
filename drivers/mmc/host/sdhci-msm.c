@@ -575,6 +575,7 @@ static int msm_init_cm_dll(struct sdhci_host *host)
 	unsigned long flags;
 	u32 wait_cnt;
 	bool prev_pwrsave, curr_pwrsave;
+	u32 reg = 0;
 
 	pr_debug("%s: Enter %s\n", mmc_hostname(mmc), __func__);
 	spin_lock_irqsave(&host->lock, flags);
@@ -672,7 +673,7 @@ static int msm_init_cm_dll(struct sdhci_host *host)
 out:
 	/* Restore the correct PWRSAVE state */
 	if (prev_pwrsave ^ curr_pwrsave) {
-		u32 reg = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC);
+			reg = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC);
 
 		if (prev_pwrsave)
 			reg |= CORE_CLK_PWRSAVE;
@@ -681,7 +682,12 @@ out:
 
 		writel_relaxed(reg, host->ioaddr + CORE_VENDOR_SPEC);
 	}
-
+	if(!strcmp(mmc_hostname(mmc), "mmc1")) 
+	{ 
+		reg = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC);
+		reg &= ~CORE_CLK_PWRSAVE; 
+		writel_relaxed(reg, host->ioaddr + CORE_VENDOR_SPEC); 
+	} 
 	spin_unlock_irqrestore(&host->lock, flags);
 	pr_debug("%s: Exit %s\n", mmc_hostname(mmc), __func__);
 	return rc;
@@ -2268,6 +2274,8 @@ static irqreturn_t sdhci_msm_sdiowakeup_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+/* resolve hynix emmc awake too long time:600+ms,turn ldo8 always on */
+extern bool emmc_vcc_need_on;
 void sdhci_msm_dump_pwr_ctrl_regs(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -2291,6 +2299,24 @@ static irqreturn_t sdhci_msm_pwr_irq(int irq, void *data)
 	int pwr_state = 0, io_level = 0;
 	unsigned long flags;
 	int retry = 10;
+
+	/*
+	 * resolve hynix emmc awake too long time:600+ms,
+	 * turn ldo8 always on, start
+	 */
+	if (emmc_vcc_need_on) {
+		if (!strcmp(mmc_hostname(msm_host->mmc), "mmc0")) {
+			msm_host->pdata->vreg_data->vdd_data->is_always_on = 1;
+			/* msm_host->pdata->vreg_data->vdd_data->lpm_sup = 1; */
+			pr_info("%s: hynix emmc ,set vdd always on\n",
+				mmc_hostname(msm_host->mmc));
+			emmc_vcc_need_on = 0;
+		}
+	}
+	/*
+	 * resolve hynix emmc awake too long time:600+ms,
+	 * turn ldo8 always on, end
+	 */
 
 	irq_status = readb_relaxed(msm_host->core_mem + CORE_PWRCTL_STATUS);
 	pr_debug("%s: Received IRQ(%d), status=0x%x\n",
@@ -2798,7 +2824,8 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
 		writel_relaxed(readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC)
 				& ~CORE_CLK_PWRSAVE,
 				host->ioaddr + CORE_VENDOR_SPEC);
-
+	if(!strcmp(mmc_hostname(host->mmc), "mmc1")) 
+		writel_relaxed(readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC) & ~CORE_CLK_PWRSAVE, host->ioaddr + CORE_VENDOR_SPEC); 
 	sup_clock = sdhci_msm_get_sup_clk_rate(host, clock);
 	if ((curr_ios.timing == MMC_TIMING_UHS_DDR50) ||
 		(curr_ios.timing == MMC_TIMING_MMC_HS400)) {

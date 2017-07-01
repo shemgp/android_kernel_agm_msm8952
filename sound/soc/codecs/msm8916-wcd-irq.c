@@ -32,6 +32,8 @@
 #define NUM_IRQ_REGS 2
 #define WCD9XXX_SYSTEM_RESUME_TIMEOUT_MS 700
 
+/*Hisese-change by zwb to solve headset detection failure when suspend*/
+#define MBHC_INT_IRQ_NUM 7
 #define BYTE_BIT_MASK(nr) (1UL << ((nr) % BITS_PER_BYTE))
 #define BIT_BYTE(nr) ((nr) / BITS_PER_BYTE)
 
@@ -228,7 +230,8 @@ static irqreturn_t wcd9xxx_spmi_irq_handler(int linux_irq, void *data)
 	irq = get_irq_bit(linux_irq);
 	if (irq == MAX_NUM_IRQS)
 		return IRQ_HANDLED;
-
+	/*Hisense add*/
+	pr_info("wcd9xxx_spmi_irq_handler irq = %d\n", irq);
 	status[BIT_BYTE(irq)] |= BYTE_BIT_MASK(irq);
 	for (i = 0; i < NUM_IRQ_REGS; i++) {
 		status[i] |= snd_soc_read(map.codec,
@@ -272,6 +275,12 @@ int wcd9xxx_spmi_suspend(pm_message_t pmesg)
 	int ret = 0;
 
 	pr_debug("%s: enter\n", __func__);
+	/*
+	* Hisense-when suspend,disable mbhc irq to avoid wrong sequence between
+	* "spmi irq handler" and "spmi resume",if not disable mbhc irq,the spmi irq handler
+	* will before spmi resume.this can cause headset detection failure when system suspend
+	*/
+	disable_irq(map.linuxirq[MBHC_INT_IRQ_NUM]);
 	/*
 	 * pm_qos_update_request() can be called after this suspend chain call
 	 * started. thus suspend can be called while lock is being held
@@ -336,6 +345,11 @@ int wcd9xxx_spmi_resume()
 	}
 	mutex_unlock(&map.pm_lock);
 	wake_up_all(&map.pm_wq);
+	/*
+	* Hisense-when resume,enable mbhc irq ,because mbhc irq is disabled during spmi suspend
+	* enable mbhc irq so spmi irq handler can handle the irq.
+	*/
+	enable_irq(map.linuxirq[MBHC_INT_IRQ_NUM]);
 
 	return ret;
 }

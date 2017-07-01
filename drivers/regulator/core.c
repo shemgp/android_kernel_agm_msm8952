@@ -1359,6 +1359,14 @@ found:
 out:
 	mutex_unlock(&regulator_list_mutex);
 
+	if (IS_ERR(regulator))  {
+		if (dev && dev->of_node)
+			pr_only_buf("[%s] [%s]: regulator_get(%s) failed :%d\n",
+				devname, dev->of_node->name, id, PTR_ERR(regulator));
+		else
+			pr_only_buf(" regulator_get(%s) failed:%d\n", id, PTR_ERR(regulator));
+	}
+
 	return regulator;
 }
 
@@ -1732,6 +1740,14 @@ int regulator_enable(struct regulator *regulator)
 	if (ret != 0 && rdev->supply)
 		regulator_disable(rdev->supply);
 
+	if (ret) {
+		if (regulator->supply_name)
+			pr_only_buf("[%s] [%s] regulator_enable failed. ret=%d\n",
+				rdev_get_name(rdev), regulator->supply_name, ret);
+		else
+			pr_only_buf("[%s] regulator_enable  failed. ret=%d\n",
+				rdev_get_name(rdev), ret);
+	}
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regulator_enable);
@@ -1827,6 +1843,15 @@ int regulator_disable(struct regulator *regulator)
 
 	if (ret == 0 && rdev->supply)
 		regulator_disable(rdev->supply);
+
+	if (ret) {
+		if (regulator->supply_name)
+			pr_only_buf("[%s] [%s] regulator_disable failed. ret=%d\n",
+				rdev_get_name(rdev), regulator->supply_name, ret);
+		else
+			pr_only_buf("[%s] regulator_disable  failed. ret=%d\n",
+				rdev_get_name(rdev), ret);
+	}
 
 	return ret;
 }

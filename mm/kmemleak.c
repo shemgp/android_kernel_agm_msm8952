@@ -323,6 +323,50 @@ static void hex_dump_object(struct seq_file *seq,
 	}
 }
 
+#ifdef CONFIG_RS_RECORDER_SUPPORT
+int rs_kmemleak_enabled_detect(void)
+{
+	return kmemleak_enabled;
+}
+EXPORT_SYMBOL(rs_kmemleak_enabled_detect);
+
+struct mutex *rs_kmemleak_get_scan_mutex(void)
+{
+	return &scan_mutex;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_scan_mutex);
+
+struct list_head *rs_kmemleak_get_list_head(void)
+{
+	return &object_list;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_list_head);
+
+struct kmem_cache *rs_kmemleak_get_object_cache(void)
+{
+	return object_cache;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_object_cache);
+
+struct kmem_cache *rs_kmemleak_get_area_cache(void)
+{
+	return scan_area_cache;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_area_cache);
+
+unsigned long rs_kmemleak_get_min_age(void)
+{
+	return jiffies_min_age;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_min_age);
+
+unsigned long rs_kmemleak_get_last_scan(void)
+{
+	return jiffies_last_scan;
+}
+EXPORT_SYMBOL(rs_kmemleak_get_last_scan);
+#endif
+
 /*
  * Object colors, encoded with count and min_count:
  * - white - orphan object, not enough references to it (count < min_count)

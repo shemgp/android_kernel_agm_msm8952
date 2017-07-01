@@ -148,6 +148,37 @@ struct aanc_data {
 	uint32_t aanc_tx_port_sample_rate;
 };
 
+#ifdef CONFIG_SND_SOC_TAS2552
+struct afe_custom_opalum_set_config_t {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2 data;
+} __packed;
+struct afe_custom_opalum_get_config_t {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_get_param_v2 param;
+	struct afe_port_param_data_v2 data;
+} __packed;
+/* Payload struct for getting or setting one integer value from/to the Opalum DSP module */
+struct opalum_single_data_ctrl_t {
+	int32_t value;
+};
+/* Payload struct for getting or setting two integer values from/to the Opalum DSP module */
+struct opalum_dual_data_ctrl_t {
+	int32_t data1;
+	int32_t data2;
+};
+/* Payload struct for sending an external configuration string to the Opalum DSP module */
+struct opalum_external_config_t {
+	uint32_t total_size;
+	uint32_t chunk_size;
+	int32_t done;
+	const char* config;
+};
+
+extern struct tas2552 *tas2552_dev;
+#endif /*CONFIG_SND_SOC_TAS2552*/
+
 int afe_open(u16 port_id, union afe_port_config *afe_config, int rate);
 int afe_close(int port_id);
 int afe_loopback(u16 enable, u16 rx_port, u16 tx_port);

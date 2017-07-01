@@ -377,7 +377,9 @@ struct device_node *of_batterydata_get_best_profile(
 				 * and also if the limits are in range
 				 * before selecting the best node.
 				 */
-				if ((delta < best_delta || !best_node)
+				pr_err("delta %d limit %d in_range %d\n",
+						delta, limit, in_range);
+				if (((delta < best_delta || !best_node))
 					&& in_range) {
 					best_node = node;
 					best_delta = delta;
@@ -403,9 +405,9 @@ struct device_node *of_batterydata_get_best_profile(
 	rc = of_property_read_string(best_node, "qcom,battery-type",
 							&battery_type);
 	if (!rc)
-		pr_info("%s found\n", battery_type);
+		pr_info("battery_type %s found\n", battery_type);
 	else
-		pr_info("%s found\n", best_node->name);
+		pr_info("best_node->name %s found\n", best_node->name);
 
 	return best_node;
 }

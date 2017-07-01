@@ -200,6 +200,20 @@ config SENSORS_HALL
 	 Say y here if you want to use this hall sensor driver, it
 	 is like a switch. For example, lid.
 
+config FPC_TEE
+	bool "FPC sensor"
+	depends on INPUT
+	---help---
+	 Say y here if you want to use this fpc sensor driver, it
+	 is like a switch. For example, lid.
+
+config EGIS_ET310
+	bool "EGIS sensor"
+	default n
+	depends on INPUT
+	---help---
+	 Say y here if you want to use this EGIS sensor driver.
+
 comment "Input Device Drivers"
 
 source "drivers/input/keyboard/Kconfig"

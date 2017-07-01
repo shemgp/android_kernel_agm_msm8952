@@ -313,8 +313,13 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 		if (copy_from_user(range, (void __user *)arg, sizeof(range)))
 			return -EFAULT;
 
+		/*return blk_ioctl_discard(bdev, range[0], range[1],
+					 cmd == BLKSECDISCARD);*/
+		/* add for resolving the bug,
+		 * device with micron emmc running slowly in SecErase-mode
+		 */
 		return blk_ioctl_discard(bdev, range[0], range[1],
-					 cmd == BLKSECDISCARD);
+					 0);
 	}
 	case BLKZEROOUT: {
 		uint64_t range[2];

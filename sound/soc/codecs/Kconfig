@@ -377,6 +377,11 @@ config SND_SOC_WSA881X
         tristate
 	select REGMAP_SWR
 
+config SND_SOC_TAS2552
+        bool "TAS2552 smartPA Support"
+    help
+        TI tas2552 smartPA driver
+
 config SND_SOC_WCD9XXX
 	tristate
 	default y if SND_SOC_WCD9320=y || SND_SOC_WCD9306=y || SND_SOC_WCD9330=y

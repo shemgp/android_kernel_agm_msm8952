@@ -569,8 +569,8 @@ int kgsl_context_init(struct kgsl_device_private *dev_priv,
 
 	if (id < 0) {
 		if (id == -ENOSPC)
-			KGSL_DRV_INFO(device,
-				"cannot have more than %zu contexts due to memstore limitation\n",
+			KGSL_DRV_ERR(device,
+				"[Bob_debug]cannot have more than %zu contexts due to memstore limitation\n",
 				KGSL_MEMSTORE_MAX);
 
 		return id;

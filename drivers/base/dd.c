@@ -350,14 +350,19 @@ probe_failed:
 		/* Did a trigger occur while probing? Need to re-trigger if yes */
 		if (local_trigger_count != atomic_read(&deferred_trigger_count))
 			driver_deferred_probe_trigger();
-	} else if (ret != -ENODEV && ret != -ENXIO) {
-		/* driver matched but the probe failed */
-		printk(KERN_WARNING
-		       "%s: probe of %s failed with error %d\n",
-		       drv->name, dev_name(dev), ret);
 	} else {
-		pr_debug("%s: probe of %s rejects match %d\n",
-		       drv->name, dev_name(dev), ret);
+		/* print failed info to hisense rer buffer */
+		pr_only_buf("%s: %s ret=%d\n", dev_name(dev), "Probe Failed", ret);
+
+		if (ret != -ENODEV && ret != -ENXIO) {
+			/* driver matched but the probe failed */
+			printk(KERN_WARNING
+					"%s: probe of %s failed with error %d\n",
+					drv->name, dev_name(dev), ret);
+		} else {
+			pr_debug("%s: probe of %s rejects match %d\n",
+					drv->name, dev_name(dev), ret);
+		}
 	}
 	/*
 	 * Ignore errors returned by ->probe so that the next driver can try

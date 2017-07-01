@@ -311,6 +311,36 @@ void msm8x16_notifier_call(struct snd_soc_codec *codec,
 	blocking_notifier_call_chain(&msm8x16_wcd->notifier, event, codec);
 }
 
+/* It takes about 13ms for Class-D PAs to ramp-up */
+#define EXT_CLASS_D_EN_DELAY 13000
+#define EXT_CLASS_D_DIS_DELAY 3000
+#define EXT_CLASS_D_DELAY_DELTA 2000
+
+enum {
+	MSM_PATH_IDLE = -1,
+	MSM_HP_PATH,
+	MSM_SPK_PATH,
+	MSM_SPK_HP_BOTH
+};
+
+enum {
+	PA_MODE_OFF = 0,
+	PA_MODE_1,
+	PA_MODE_2,
+	PA_MODE_3,
+	PA_MODE_4,
+	PA_MODE_5,
+	PA_MODE_6,
+	PA_MODE_7,
+	PA_MODE_8
+};
+
+static int spk_hp_switch = MSM_PATH_IDLE;
+/*default mode 2 for AW8xxx*/
+int msm_ext_spk_pa_mode = PA_MODE_2;
+bool is_session_playback;
+
+
 static int get_spmi_msm8x16_wcd_device_info(u16 *reg,
 			struct msm8x16_wcd_spmi **msm8x16_wcd)
 {
@@ -1655,6 +1685,51 @@ static int msm8x16_wcd_put_iir_band_audio_mixer(
 	return 0;
 }
 
+static int msm_spk_hp_switch_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: switch = %d\n", __func__, spk_hp_switch);
+	ucontrol->value.integer.value[0] = spk_hp_switch;
+	return 0;
+}
+
+static int msm_spk_hp_switch_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	spk_hp_switch = ucontrol->value.integer.value[0];
+	pr_debug("%s: switch = %d\n", __func__, spk_hp_switch);
+	return 0;
+}
+
+static int msm_ext_spk_pa_mode_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: PA mode = %d\n", __func__, msm_ext_spk_pa_mode);
+	ucontrol->value.integer.value[0] = msm_ext_spk_pa_mode;
+	return 0;
+}
+
+static int msm_ext_spk_pa_mode_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	msm_ext_spk_pa_mode = ucontrol->value.integer.value[0];
+	pr_debug("%s: PA mode = %d\n", __func__, msm_ext_spk_pa_mode);
+	return 0;
+}
+
+static const char * const msm_spk_hp_switch_text[] = {
+				"HP", "Spk", "BOTH ON"};
+static const struct soc_enum msm_spk_hp_switch_enum[] = {
+		SOC_ENUM_SINGLE_EXT(3, msm_spk_hp_switch_text),
+};
+
+static const char * const msm_ext_spk_pa_mode_text[] = {
+				"Off", "Mode_1", "Mode_2", "Mode_3", "Mode_4",
+				"Mode_5", "Mode_6", "Mode_7", "Mode_8"};
+static const struct soc_enum msm_ext_spk_pa_mode_enum[] = {
+		SOC_ENUM_SINGLE_EXT(9, msm_ext_spk_pa_mode_text),
+};
+
 static const char * const msm8x16_wcd_loopback_mode_ctrl_text[] = {
 		"DISABLE", "ENABLE"};
 static const struct soc_enum msm8x16_wcd_loopback_mode_ctl_enum[] = {
@@ -1737,6 +1812,12 @@ static const struct snd_kcontrol_new msm8x16_wcd_snd_controls[] = {
 					8, 0, analog_gain),
 	SOC_SINGLE_TLV("ADC3 Volume", MSM8X16_WCD_A_ANALOG_TX_3_EN, 3,
 					8, 0, analog_gain),
+
+	SOC_ENUM_EXT("Spk HP Switch", msm_spk_hp_switch_enum[0],
+			msm_spk_hp_switch_get, msm_spk_hp_switch_put),
+
+	SOC_ENUM_EXT("Ext Spk PA Mode", msm_ext_spk_pa_mode_enum[0],
+		msm_ext_spk_pa_mode_get, msm_ext_spk_pa_mode_put),
 
 	SOC_SINGLE_SX_TLV("RX1 Digital Volume",
 			  MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL,
@@ -3122,7 +3203,8 @@ void wcd_imped_config(struct snd_soc_codec *codec,
 		return;
 	}
 	if (value >= wcd_imped_val[ARRAY_SIZE(wcd_imped_val) - 1]) {
-		pr_err("%s, invalid imped, greater than 48 Ohm\n = %d\n",
+		/*Hisense modified*/
+		pr_debug("%s, invalid imped, greater than 48 Ohm\n = %d\n",
 			__func__, value);
 		return;
 	}
@@ -3211,7 +3293,7 @@ static int msm8x16_wcd_hphl_dac_event(struct snd_soc_dapm_widget *w,
 			wcd_imped_config(codec, impedl, true);
 		else
 			dev_err(codec->dev, "Failed to get mbhc impedance %d\n",
-				ret);
+				ret); /*Hisense modified*/
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		snd_soc_update_bits(codec,
@@ -3282,8 +3364,9 @@ static int msm8x16_wcd_hph_pa_event(struct snd_soc_dapm_widget *w,
 					WCD_EVENT_PRE_HPHR_PA_ON);
 		snd_soc_update_bits(codec,
 				MSM8X16_WCD_A_ANALOG_NCP_FBCTRL, 0x20, 0x20);
-		break;
 
+		break;
+	/*Hisense modified*/
 	case SND_SOC_DAPM_POST_PMU:
 		usleep_range(7000, 7100);
 		if (w->shift == 5) {
@@ -3297,9 +3380,30 @@ static int msm8x16_wcd_hph_pa_event(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 				MSM8X16_WCD_A_CDC_RX2_B6_CTL, 0x01, 0x00);
 		}
+		if (spk_hp_switch == MSM_HP_PATH) {
+			if (!strncmp(w->name, "HPHL PA", 8)) {
+				msleep(30);
+				if (headset_switch_gpio >= 0)
+					gpio_direction_output(headset_switch_gpio, 1);
+			}
+		} else if (spk_hp_switch >= MSM_SPK_PATH) {
+			if (!strncmp(w->name, "HPHL PA", 8)) {
+				if (headset_switch_gpio >= 0) {
+					if (spk_hp_switch == MSM_SPK_HP_BOTH)
+						gpio_direction_output(headset_switch_gpio, 1);
+					else
+						gpio_direction_output(headset_switch_gpio, 0);
+				}
+			}
+		}
 		break;
 
 	case SND_SOC_DAPM_PRE_PMD:
+		if ((spk_hp_switch >= MSM_SPK_PATH) && (!strncmp(w->name, "HPHL PA", 8))) {
+			msleep(30);
+			if (headset_switch_gpio >= 0)
+				gpio_direction_output(headset_switch_gpio, 1);
+		}
 		if (w->shift == 5) {
 			snd_soc_update_bits(codec,
 				MSM8X16_WCD_A_CDC_RX1_B6_CTL, 0x01, 0x01);
@@ -3501,10 +3605,12 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"IIR2 INP1 MUX", "DEC2", "DEC2 MUX"},
 	{"MIC BIAS Internal1", NULL, "INT_LDO_H"},
 	{"MIC BIAS Internal2", NULL, "INT_LDO_H"},
+	{"MIC BIAS Internal3", NULL, "INT_LDO_H"}, /*Hisense modified*/
 	{"MIC BIAS External", NULL, "INT_LDO_H"},
 	{"MIC BIAS External2", NULL, "INT_LDO_H"},
 	{"MIC BIAS Internal1", NULL, "MICBIAS_REGULATOR"},
 	{"MIC BIAS Internal2", NULL, "MICBIAS_REGULATOR"},
+	{"MIC BIAS Internal3", NULL, "MICBIAS_REGULATOR"}, /*Hisense modified*/
 	{"MIC BIAS External", NULL, "MICBIAS_REGULATOR"},
 	{"MIC BIAS External2", NULL, "MICBIAS_REGULATOR"},
 };
@@ -3526,6 +3632,8 @@ static int msm8x16_wcd_startup(struct snd_pcm_substream *substream,
 		dev_err(dai->codec->dev, "Error, Device is not up post SSR\n");
 		return -EINVAL;
 	}
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		is_session_playback = true;
 	return 0;
 }
 
@@ -3535,6 +3643,8 @@ static void msm8x16_wcd_shutdown(struct snd_pcm_substream *substream,
 	dev_dbg(dai->codec->dev,
 		"%s(): substream = %s  stream = %d\n" , __func__,
 		substream->name, substream->stream);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK && is_session_playback)
+		is_session_playback = false;
 }
 
 static int msm8x16_wcd_codec_enable_clock_block(struct snd_soc_codec *codec,
@@ -4507,10 +4617,25 @@ static int adsp_state_callback(struct notifier_block *nb, unsigned long value,
 {
 	bool timedout;
 	unsigned long timeout;
+	/*Hisense add to rewrite the ADC volume after ADSP reboot.*/
+	static unsigned int adc1_vol =
+		MSM8X16_WCD_A_ANALOG_TX_1_EN__POR;
+	static unsigned int adc2_vol =
+		MSM8X16_WCD_A_ANALOG_TX_2_EN__POR;
+	static unsigned int adc3_vol =
+		MSM8X16_WCD_A_ANALOG_TX_3_EN__POR;
+	/*Hisense add end*/
 
-	if (value == SUBSYS_BEFORE_SHUTDOWN)
+	if (value == SUBSYS_BEFORE_SHUTDOWN) {
+		/*Hisense add to save the ADC volume before ADSP reboot.*/
+		adc1_vol = snd_soc_read(registered_codec, MSM8X16_WCD_A_ANALOG_TX_1_EN);
+		adc2_vol = snd_soc_read(registered_codec, MSM8X16_WCD_A_ANALOG_TX_2_EN);
+		adc3_vol = snd_soc_read(registered_codec, MSM8X16_WCD_A_ANALOG_TX_3_EN);
+		pr_info("%s: adc1_vol = 0x%x,adc2_vol = 0x%x,adc3_vol = 0x%x\n",
+		    __func__, adc1_vol, adc2_vol, adc3_vol);
+		/*Hisense add end*/
 		msm8x16_wcd_device_down(registered_codec);
-	else if (value == SUBSYS_AFTER_POWERUP) {
+	} else if (value == SUBSYS_AFTER_POWERUP) {
 
 		dev_dbg(registered_codec->dev,
 			"ADSP is about to power up. bring up codec\n");
@@ -4536,6 +4661,11 @@ static int adsp_state_callback(struct notifier_block *nb, unsigned long value,
 		}
 
 		msm8x16_wcd_device_up(registered_codec);
+		/*Hisense add to rewrite the ADC volume after ADSP reboot.*/
+		snd_soc_write(registered_codec, MSM8X16_WCD_A_ANALOG_TX_1_EN, adc1_vol);
+		snd_soc_write(registered_codec, MSM8X16_WCD_A_ANALOG_TX_2_EN, adc2_vol);
+		snd_soc_write(registered_codec, MSM8X16_WCD_A_ANALOG_TX_3_EN, adc3_vol);
+		/*Hisense add end*/
 	}
 	return NOTIFY_OK;
 }

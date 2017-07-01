@@ -24,6 +24,8 @@
 #include "include/msm_csid_3_2_hwreg.h"
 #include "include/msm_csid_3_4_1_hwreg.h"
 
+
+
 #define V4L2_IDENT_CSID                            50002
 #define CSID_VERSION_V20                      0x02000011
 #define CSID_VERSION_V22                      0x02001000
@@ -962,11 +964,13 @@ static int msm_csid_get_clk_info(struct csid_device *csid_dev,
 	return 0;
 }
 
+
 static int csid_probe(struct platform_device *pdev)
 {
 	struct csid_device *new_csid_dev;
 	uint32_t csi_vdd_voltage = 0;
 	int rc = 0;
+
 	new_csid_dev = kzalloc(sizeof(struct csid_device), GFP_KERNEL);
 	if (!new_csid_dev) {
 		pr_err("%s: no enough memory\n", __func__);
@@ -1108,6 +1112,8 @@ static int csid_probe(struct platform_device *pdev)
 	}
 
 	new_csid_dev->csid_state = CSID_POWER_DOWN;
+
+
 	return 0;
 
 csid_no_resource:

@@ -2132,6 +2132,13 @@ slab_out_of_memory(struct kmem_cache *s, gfp_t gfpflags, int nid)
 		"default order: %d, min order: %d\n", s->name, s->object_size,
 		s->size, oo_order(s->oo), oo_order(s->min));
 
+	pr_only_buf("SLUB: Unable to allocate memory on node %d (gfp=0x%x)\n",
+		nid, gfpflags);
+
+	pr_only_buf("  cache: %s, object size: %d, buffer size: %d, "
+		"default order: %d, min order: %d\n", s->name, s->object_size,
+		s->size, oo_order(s->oo), oo_order(s->min));
+
 	if (oo_order(s->min) > get_order(s->object_size))
 		printk(KERN_WARNING "  %s debugging increased min order, use "
 		       "slub_debug=O to disable.\n", s->name);

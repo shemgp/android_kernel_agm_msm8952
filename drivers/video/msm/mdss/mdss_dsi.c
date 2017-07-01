@@ -36,6 +36,12 @@
 /* Master structure to hold all the information about the DSI/panel */
 static struct mdss_dsi_data *mdss_dsi_res;
 
+/* add by hisense */
+#define ESD_CHECK_BUF_SIZE		32
+static char mdss_panel_esd[ESD_CHECK_BUF_SIZE];
+//add by hisense for lcd_id
+char mdss_panel_lcd_id[32];
+
 #define DSI_DISABLE_PC_LATENCY 100
 #define DSI_ENABLE_PC_LATENCY PM_QOS_DEFAULT_VALUE
 
@@ -241,6 +247,18 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		ret = 0;
 	}
 
+	/*add for vci 3.3v control.*/
+	ret = mdss_dsi_panel_vci_ctrl(pdata,0);
+	if (ret)
+		pr_err("%s: Panel vci disable failed. rc=%d\n",__func__, ret);
+
+	/* hisense add */
+	if (gpio_is_valid(ctrl_pdata->lcdenp_gpio))
+		gpio_set_value((ctrl_pdata->lcdenp_gpio), 0);
+
+	if (gpio_is_valid(ctrl_pdata->lcdenn_gpio))
+		gpio_set_value((ctrl_pdata->lcdenn_gpio), 0);
+
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
 
@@ -277,6 +295,25 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 		return ret;
 	}
 
+
+	/* add for reset and vci gpio state setting.*/
+	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
+		pr_debug("lcd gpio enable: pinctrl not enabled\n");
+
+	/*add for vci 3.3v control.*/
+	ret = mdss_dsi_panel_vci_ctrl(pdata,1);
+	if (ret)
+		pr_err("%s: Panel vci enable failed. rc=%d\n",__func__, ret);
+
+	/* hisense add */
+	if (gpio_is_valid(ctrl_pdata->lcdenp_gpio))
+		gpio_set_value((ctrl_pdata->lcdenp_gpio), 1);
+
+	if (gpio_is_valid(ctrl_pdata->lcdenn_gpio))
+		gpio_set_value((ctrl_pdata->lcdenn_gpio), 1);
+	/* backlight */
+	if (gpio_is_valid(ctrl_pdata->bklt_en_gpio))
+		gpio_set_value((ctrl_pdata->bklt_en_gpio), 1);
 	/*
 	 * If continuous splash screen feature is enabled, then we need to
 	 * request all the GPIOs that have already been configured in the
@@ -285,9 +322,11 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	 */
 	if (pdata->panel_info.cont_splash_enabled ||
 		!pdata->panel_info.mipi.lp11_init) {
+		/*
+		 *delete.don't judge lp11 spalsh or not.
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
 			pr_debug("reset enable: pinctrl not enabled\n");
-
+		*/
 		ret = mdss_dsi_panel_reset(pdata, 1);
 		if (ret)
 			pr_err("%s: Panel reset failed. rc=%d\n",
@@ -1266,8 +1305,12 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	 * data lanes for LP11 init
 	 */
 	if (mipi->lp11_init) {
+		
+		/*
+		//delete.don't judge lp11 spalsh or not.
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
 			pr_debug("reset enable: pinctrl not enabled\n");
+		*/	
 		mdss_dsi_panel_reset(pdata, 1);
 	}
 
@@ -3239,6 +3282,12 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
 		pr_err("%s:%d, reset gpio not specified\n",
 						__func__, __LINE__);
+						
+	ctrl_pdata->vci_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			 "qcom,platform-vci-enable-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->vci_en_gpio))
+		pr_err("%s:%d, vci enable gpio not specified\n",
+						__func__, __LINE__);						
 
 	if (pinfo->mode_gpio_state != MODE_GPIO_NOT_VALID) {
 
@@ -3251,9 +3300,312 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	} else {
 		ctrl_pdata->mode_gpio = -EINVAL;
 	}
+	/*
+	*  hisense add ENP & ENN GPIO for +/-5V power
+	*/
+	ctrl_pdata->lcdenp_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			 "qcom,mdss-dsi-lcdenp-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->lcdenp_gpio)) {
+		pr_info("%s:%d, lcd enp gpio not specified\n",__func__, __LINE__);
+	}
+
+	ctrl_pdata->lcdenn_gpio=of_get_named_gpio(ctrl_pdev->dev.of_node,
+			 "qcom,mdss-dsi-lcdenn-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->lcdenn_gpio)) {
+		pr_info("%s:%d, lcd enn gpio not specified\n",__func__, __LINE__);
+	}
+	return 0;
+}
+/*add from mdss_dsi_panel.c*/
+static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	int rc = 0;
+
+	if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->disp_en_gpio,
+						"disp_enable");
+		if (rc) {
+			pr_err("request disp_en gpio failed, rc=%d\n",
+				       rc);
+			goto disp_en_gpio_err;
+		}
+	}
+	rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
+	if (rc) {
+		pr_err("request reset gpio failed, rc=%d\n",
+			rc);
+		goto rst_gpio_err;
+	}
+
+	if (gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->vci_en_gpio,
+						"vci_enable");
+		if (rc) {
+			pr_err("request vci enable gpio failed, rc=%d\n",
+				       rc);
+			goto vci_en_gpio_err;
+		}
+	}	
+	if (gpio_is_valid(ctrl_pdata->bklt_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->bklt_en_gpio,
+						"bklt_enable");
+		if (rc) {
+			pr_err("request bklt gpio failed, rc=%d\n",
+				       rc);
+			goto bklt_en_gpio_err;
+		}
+	}
+	if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
+		rc = gpio_request(ctrl_pdata->mode_gpio, "panel_mode");
+		if (rc) {
+			pr_err("request panel mode gpio failed,rc=%d\n",
+								rc);
+			goto mode_gpio_err;
+		}
+	}
+
+	/* hisense add */
+	if (gpio_is_valid(ctrl_pdata->lcdenp_gpio)) {
+		rc = gpio_request(ctrl_pdata->lcdenp_gpio,"lcd_enp");
+		if (rc) {
+			pr_err("request lcd enp gpio failed, rc=%d\n",
+				rc);
+			goto lcdenp_gpio_err;
+		}
+	}
+	if (gpio_is_valid(ctrl_pdata->lcdenn_gpio)) {
+		rc = gpio_request(ctrl_pdata->lcdenn_gpio,"lcd_enn");
+		if (rc) {
+			pr_err("request lcd enn gpio failed, rc=%d\n",
+				rc);
+			goto lcdenn_gpio_err;
+		}
+	}
+	return rc;
+lcdenn_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->lcdenn_gpio))
+		gpio_free(ctrl_pdata->lcdenn_gpio);
+lcdenp_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->lcdenp_gpio))
+		gpio_free(ctrl_pdata->lcdenp_gpio);
+mode_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->bklt_en_gpio))
+		gpio_free(ctrl_pdata->bklt_en_gpio);
+bklt_en_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->vci_en_gpio))
+		gpio_free(ctrl_pdata->vci_en_gpio);
+vci_en_gpio_err:
+	gpio_free(ctrl_pdata->rst_gpio);	
+rst_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
+		gpio_free(ctrl_pdata->disp_en_gpio);
+disp_en_gpio_err:
+	return rc;
+}
+
+/* add by hisense start */
+static int mdss_dsi_phy_calc_register_value(int min_val,
+		int max_val, int percent)
+{
+	int remainder = 0;
+	int reg_value = 0;
+
+	remainder = (max_val * percent + (100-percent) * min_val) % 100;
+	reg_value = (max_val * percent + (100-percent) * min_val) / 100;
+	reg_value = reg_value + (remainder ? 1 : 0);
+	reg_value = reg_value - ((reg_value % 2) ? 1 : 0);
+
+	return reg_value;
+}
+
+#define NS2UI_ROUNDUP(r, n, c, m) do {		\
+	if (n > 0)			\
+		r = (n) / c + (((n) % c) ? 1 : 0) - m;		\
+	else				\
+		r =  (n) / c - (((n) % c) ? 1 : 0) - m;	\
+} while (0)
+
+#define DSI_REG_CALC_ROUNDUP(mi, ma, p)  ((((ma) * (p) +	\
+	(100 - (p)) * (mi)) / 100) + ((((ma) * (p) +	\
+	(100 - (p)) * (mi)) % 100) ? 1 : 0))
+
+/*****************************************************
+			MIPI PHY v1.1 requirement	Recommended settings
+			min (ns)          max (ns)	   min	max
+T_CLK_PREPARE	 38	                95
+T_CLK_ZERO          300-T_CLK_PREPARE            min>255?511:255
+T_CLK_TRAIL	        60
+T_HS_PREPARE	 40+4*UI	         85+6UI
+T_HS_ZERO	145+10*UI-T_HS_PREPARE			255
+T_HS_TRAIL            60+4*UI
+T_HS_RQST
+T_HS_EXIT			100                                   255
+T_TA_GO                4*T_LPX	4*T_LPX
+T_TA_SURE	         T_LPX          2*T_LPX
+T_TA_GET	         5*T_LPX       5*T_LPX
+T_CLK_POST		60+52*UI					63
+T_CLK_PRE			8*UI                                 63
+******************************************************/
+static int mdss_dsi_phy_timing_config(struct mdss_panel_info *pinfo)
+{
+	struct mipi_panel_info *mpinfo = NULL;
+	u32 bit_clk;
+	int CLK_ZERO, CLK_TRAIL, CLK_PREPARE, CLK_PRE;
+	int  CLK_POST, HS_EXIT, ui, min, max, temp, reg_value, percent, LPX;
+	int TA_SURE, TA_GO, TA_GET;
+	int HS_ZERO, HS_PREPARE, HS_TRAIL, HS_RQST;
+
+	if (!pinfo) {
+		pr_err("%s: invalid input\n", __func__);
+		return -EINVAL;
+	}
+
+	mpinfo = &pinfo->mipi;
+	if (!mpinfo) {
+		pr_err("%s: invalid data\n", __func__);
+		return -EINVAL;
+	}
+
+	if (mpinfo->dsi_phy_db.timing[0] != 0 ||
+		mpinfo->dsi_phy_db.timing[2] != 0) {
+		pr_info("dsi phy timing already config,not need calculation\n");
+		return 0;
+	}
+
+	bit_clk = pinfo->clk_rate / 1000000;
+	if (!bit_clk) {
+		pr_err("%s: bit_clk is 0,unabel calculate timing\n", __func__);
+		return -EINVAL;
+	}
+
+	ui = 1000000 / bit_clk;
+
+	/* T_clk_preper */
+	NS2UI_ROUNDUP(min, 38 * 1000, ui, 2);
+	NS2UI_ROUNDUP(max, 95 * 1000, ui, 2);
+	CLK_PREPARE = mdss_dsi_phy_calc_register_value(min, max, 10);
+
+	/*
+	 * T_hs_rqst
+	 * LPX = 1000/19.2 = 52.083
+	 */
+	LPX = 52083;
+	HS_RQST = LPX / ui - (((LPX / ui) % 2) ? 0 : 2);
+	if (HS_RQST < 0)
+		HS_RQST = 0;
+
+	/* T_clk_zero */
+	NS2UI_ROUNDUP(min, 300 * 1000 - (CLK_PREPARE / 2 + 1) * 2 * ui, ui, 2);
+	max = (min > 255) ? 511 : 255;
+	percent = 10;
+	if (max == 255) {
+		reg_value = mdss_dsi_phy_calc_register_value(min, max, percent);
+		temp = (reg_value + CLK_PREPARE + HS_RQST) % 8;
+		if (temp == 0)
+			CLK_ZERO = reg_value;
+	       else
+			CLK_ZERO = ((reg_value + CLK_PREPARE + HS_RQST) / 8 +
+						1) * 8 - CLK_PREPARE - HS_RQST;
+	} else {
+		reg_value = ((100 + percent) * min) / 100 +
+					(((100 + percent) * min) % 100 ? 1 : 0);
+		reg_value = reg_value - ((reg_value % 2) ? 1 : 0);
+		temp = (reg_value + CLK_PREPARE + HS_RQST) % 8;
+		if (temp == 0)
+			CLK_ZERO = reg_value;
+	       else
+			CLK_ZERO = ((reg_value + CLK_PREPARE + HS_RQST) / 8 +
+						1) * 8 - CLK_PREPARE - HS_RQST;
+	}
+
+	/* T_clk_trail */
+	NS2UI_ROUNDUP(min, 60 * 1000, ui, 2);
+	NS2UI_ROUNDUP(max, 85 * 1000 + 12 * ui, ui, 2);
+	percent = (bit_clk > 180) ? 10 : 40;
+	CLK_TRAIL = mdss_dsi_phy_calc_register_value(min, max, percent);
+	if (CLK_TRAIL < 0)
+		CLK_TRAIL = 0;
+
+	/* low power BTA*/
+	TA_SURE = 0;
+	TA_GO = 3;
+	TA_GET = 4;
+
+	/* T_hs_exit */
+	NS2UI_ROUNDUP(min, 100 * 1000, ui, 2);
+	max = 255;
+	HS_EXIT = mdss_dsi_phy_calc_register_value(min, max, 10);
+	if (HS_EXIT < 0)
+		HS_EXIT = 0;
+
+	/* T_hs_prepare */
+	NS2UI_ROUNDUP(min, 40 * 1000 + 4 * ui, ui, 2);
+	NS2UI_ROUNDUP(max, 85 * 1000 + 6 * ui, ui, 2);
+	percent = (bit_clk > 1200) ? 15 : 10;
+	HS_PREPARE = mdss_dsi_phy_calc_register_value(min, max, percent);
+	if (HS_PREPARE < 0)
+		HS_PREPARE = 0;
+
+	/* T_hs_zero */
+	NS2UI_ROUNDUP(min, 145 * 1000 + 10 * ui -
+		(HS_PREPARE / 2 + 2) * 2 * ui, ui, 2);
+	max = 255;
+	HS_ZERO = mdss_dsi_phy_calc_register_value(min, max, 10);
+	if (HS_ZERO < 24)
+		HS_ZERO = 24;
+
+	/* T_hs_trail */
+	NS2UI_ROUNDUP(min, 60 * 1000 + 4 * ui, ui, 2);
+	NS2UI_ROUNDUP(max, 85 * 1000 + 12 * ui, ui, 2);
+	percent = (bit_clk > 180) ? 10 : 40;
+	HS_TRAIL = mdss_dsi_phy_calc_register_value(min, max, percent);
+	if (HS_TRAIL < 0)
+		HS_TRAIL = 0;
+
+	/* T_clk_pre */
+	NS2UI_ROUNDUP(min, (8 * ui + (CLK_PREPARE / 2 + 1) * 2 * ui +
+		(CLK_ZERO / 2 + 1) * 2 * ui + 52 * 1000) / 8, ui, 1);
+	max = 63;
+	if (min > 63)
+		CLK_PRE = DSI_REG_CALC_ROUNDUP(min, max * 2, 10);
+	else
+		CLK_PRE = DSI_REG_CALC_ROUNDUP(min, max, 10);
+
+	if (CLK_PRE < 0)
+		CLK_PRE = 0;
+	else if (min > max)
+		CLK_PRE = CLK_PRE >> 1;
+
+	/* T_clk_post */
+	NS2UI_ROUNDUP(min, (60 * 1000 + 28 * ui -
+		(HS_EXIT / 2 + 1) * 2 * ui) / 8, ui, 1);
+	max = 63;
+	CLK_POST = DSI_REG_CALC_ROUNDUP(min, max, 10);
+	if (CLK_POST < 0)
+		CLK_POST = 0;
+
+	mpinfo->dsi_phy_db.timing[0] = CLK_ZERO;
+	mpinfo->dsi_phy_db.timing[1] = CLK_TRAIL;
+	mpinfo->dsi_phy_db.timing[2] = CLK_PREPARE;
+	mpinfo->dsi_phy_db.timing[3] = TA_SURE;
+	mpinfo->dsi_phy_db.timing[4] = HS_EXIT;
+	mpinfo->dsi_phy_db.timing[5] = HS_ZERO;
+	mpinfo->dsi_phy_db.timing[6] = HS_PREPARE;
+	mpinfo->dsi_phy_db.timing[7] = HS_TRAIL;
+	mpinfo->dsi_phy_db.timing[8] = HS_RQST;
+	mpinfo->dsi_phy_db.timing[9] = TA_GO;
+	mpinfo->dsi_phy_db.timing[10] = TA_GET;
+	mpinfo->dsi_phy_db.timing[11] = 0;
+	mpinfo->t_clk_post = CLK_POST;
+	mpinfo->t_clk_pre = CLK_PRE;
+	pr_info("dsi phy:%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,0, %x,%x,clk_rate=%d\n",
+		CLK_ZERO, CLK_TRAIL, CLK_PREPARE, TA_SURE, HS_EXIT, HS_ZERO,
+		HS_PREPARE, HS_TRAIL, HS_RQST, TA_GO, TA_GET,
+		CLK_POST, CLK_PRE, bit_clk);
 
 	return 0;
 }
+/* add by hisense end */
 
 int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 	struct device_node *pan_node, struct mdss_dsi_ctrl_pdata *ctrl_pdata)
@@ -3277,6 +3629,14 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 		pr_err("%s: unable to initialize the clk dividers\n", __func__);
 		return rc;
 	}
+
+	/* add by hisense start */
+	rc = mdss_dsi_phy_timing_config(pinfo);
+	if (rc) {
+		pr_err("%s: timing config error\n", __func__);
+		return rc;
+	}
+	/* add by hisense end */
 
 	rc = mdss_dsi_get_dt_vreg_data(&ctrl_pdev->dev, pan_node,
 		&ctrl_pdata->panel_power_data, DSI_PANEL_PM);
@@ -3311,6 +3671,14 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 						__func__, rc);
 		return rc;
 	}
+
+	/*add gpio request func*/
+	rc = mdss_dsi_request_gpios(ctrl_pdata);
+	if (rc) {
+		pr_err("gpio request failed\n");
+		return -ENODEV;
+	}
+    /*add end*/
 
 	if (mdss_dsi_link_clk_init(ctrl_pdev, ctrl_pdata)) {
 		pr_err("%s: unable to initialize Dsi ctrl clks\n", __func__);
@@ -3453,6 +3821,15 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 	panel_debug_register_base("panel",
 		ctrl_pdata->ctrl_base, ctrl_pdata->reg_size);
 
+	/* add by hisense for esd check */
+	if (!strcmp(mdss_panel_esd, "enable")) {
+		ctrl_pdata->esd_check_switch = 1;
+		pr_info("%s: esd check can enable\n", __func__);
+	} else {
+		ctrl_pdata->esd_check_switch = 0;
+		pr_info("%s: do not enable esd check\n", __func__);
+	}
+
 	pr_debug("%s: Panel data initialized\n", __func__);
 	return 0;
 }
@@ -3520,6 +3897,14 @@ static int __init mdss_dsi_ctrl_driver_init(void)
 
 	return ret;
 }
+
+/* add by hisense for esd check */
+module_param_string(esd_check, mdss_panel_esd, ESD_CHECK_BUF_SIZE, 0);
+MODULE_PARM_DESC(esd_check, "Signature to enable ESD CHECK or not");
+//add by hisense for lcd_id
+module_param_string(lcd_id, mdss_panel_lcd_id, 32, 0);
+MODULE_PARM_DESC(lcd_id, "Signature to read lcd id from LK");
+
 module_init(mdss_dsi_ctrl_driver_init);
 
 static void __exit mdss_dsi_driver_cleanup(void)

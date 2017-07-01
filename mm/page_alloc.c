@@ -2132,6 +2132,9 @@ void warn_alloc_failed(gfp_t gfp_mask, int order, const char *fmt, ...)
 	pr_warn("%s: page allocation failure: order:%d, mode:0x%x\n",
 		current->comm, order, gfp_mask);
 
+	pr_only_buf("%s: page allocation failure: order:%d, mode:0x%x\n",
+		current->comm, order, gfp_mask);
+
 	dump_stack();
 	if (!should_suppress_show_mem())
 		show_mem(filter);

@@ -103,6 +103,10 @@ static ssize_t power_supply_show_property(struct device *dev,
 		return sprintf(buf, "%s\n", type_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_SCOPE)
 		return sprintf(buf, "%s\n", scope_text[value.intval]);
+	else if(off == POWER_SUPPLY_PROP_CHARGER_TYPE)
+		return sprintf(buf, "%s\n", type_text[value.intval]);
+	else if(off == POWER_SUPPLY_PROP_CHARGE_STATUS)
+        return sprintf(buf, "%s\n", status_text[value.intval]);
 	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
 		return sprintf(buf, "%s\n", value.strval);
 
@@ -213,6 +217,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(resistance_capacitive),
 	POWER_SUPPLY_ATTR(resistance_id),
 	POWER_SUPPLY_ATTR(resistance_now),
+	POWER_SUPPLY_ATTR(load_profile),
 	/* Local extensions */
 	POWER_SUPPLY_ATTR(usb_hc),
 	POWER_SUPPLY_ATTR(usb_otg),
@@ -221,9 +226,12 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(update_now),
 	POWER_SUPPLY_ATTR(esr_count),
 	POWER_SUPPLY_ATTR(safety_timer_enabled),
+	POWER_SUPPLY_ATTR(charge_timer_enabled),
 	POWER_SUPPLY_ATTR(charge_done),
 	POWER_SUPPLY_ATTR(allow_detection),
 	POWER_SUPPLY_ATTR(flash_active),
+	POWER_SUPPLY_ATTR(charger_type),
+	POWER_SUPPLY_ATTR(charge_status),
 	POWER_SUPPLY_ATTR(force_tlim),
 	POWER_SUPPLY_ATTR(cycle_count_id),
 	POWER_SUPPLY_ATTR(safety_timer_expired),

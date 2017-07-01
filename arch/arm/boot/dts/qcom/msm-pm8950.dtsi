@@ -44,6 +44,8 @@
 				"resin-bark", "kpdpwr-resin-bark";
 			qcom,pon-dbc-delay = <15625>;
 			qcom,system-reset;
+			qcom,clear-warm-reset;
+			qcom,store-hard-reset-reason;
 
 			qcom,pon_1 {
 				qcom,pon-type = <0>;
@@ -56,6 +58,7 @@
 				qcom,pull-up = <1>;
 				linux,code = <114>;
 			};
+
 		};
 
 		pm8950_coincell: qcom,coincell@2800 {
@@ -367,6 +370,7 @@
 			compatible = "qcom,leds-qpnp";
 			reg = <0xa300 0x100>;
 			label = "mpp";
+			status = "disabled";
 		};
 	};
 
@@ -375,6 +379,22 @@
 		reg = <0x1>;
 		#address-cells = <1>;
 		#size-cells = <1>;
+
+		qcom,reg_raw_dbg@c000 {
+			compatible = "qcom,qpnp-reg-dbg";
+			label = "reg-dbg";
+			status = "okay";
+			qcom,smps-base-addr = <0x1400>;
+			qcom,ldo-base-addr = <0x4000>;
+			qcom,mpp-base-addr = <0xa000>;
+			qcom,gpio-base-addr = <0xc000>;
+			qcom,smps-count = <6>;
+			qcom,ldo-count = <23>;
+			qcom,mpp-count = <4>;
+			qcom,gpio-count = <8>;
+		};
+
+
 
 		pm8950_pwm: pwm@bc00 {
 			status = "disabled";

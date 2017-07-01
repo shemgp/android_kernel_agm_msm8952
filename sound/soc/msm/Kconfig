@@ -274,6 +274,12 @@ config SND_SOC_MSM8X16
 	 the machine drivers and the corresponding
 	 DAI-links.
 
+config AUDIO_PROBE_DELAY
+	bool "Enable Audio Machine driver probe delay"
+	default n
+	help
+	 To add support for audio probe delay.
+
 config SND_SOC_MSM8909
 	tristate "SoC Machine driver for MSM8909 boards"
 	depends on ARCH_MSM8909

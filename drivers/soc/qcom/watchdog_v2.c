@@ -407,10 +407,15 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	nanosec_rem = do_div(t, 1000000000);
 	printk(KERN_INFO "Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,
 		nanosec_rem / 1000);
+	pr_only_buf("Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,
+		nanosec_rem / 1000);
 
 	nanosec_rem = do_div(wdog_dd->last_pet, 1000000000);
 	printk(KERN_INFO "Watchdog last pet at %lu.%06lu\n", (unsigned long)
 		wdog_dd->last_pet, nanosec_rem / 1000);
+	pr_only_buf("Watchdog last pet at %lu.%06lu bark_time %d pet_time %d\n",
+		(unsigned long) wdog_dd->last_pet, nanosec_rem / 1000,
+		wdog_dd->bark_time, wdog_dd->pet_time);
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
 	msm_trigger_wdog_bite();

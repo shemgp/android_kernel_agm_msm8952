@@ -63,7 +63,7 @@ extern u8 print_limit_option;
 
 #define SPS_DEBUGFS(msg, args...) do {					\
 		char buf[MAX_MSG_LEN];		\
-		snprintf(buf, MAX_MSG_LEN, msg"\n", ##args);	\
+		snprintf(buf, MAX_MSG_LEN, msg, ##args);	\
 		sps_debugfs_record(buf);	\
 	} while (0)
 #define SPS_ERR(msg, args...) do {					\

@@ -2402,6 +2402,9 @@ void cnss_device_self_recovery(void)
 	cnss_powerup(NULL);
 	cnss_pm_wake_lock_release(&penv->ws);
 	penv->recovery_in_progress = false;
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+	subsystem_report("wcnss", "wcnss self recovery");
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
 }
 EXPORT_SYMBOL(cnss_device_self_recovery);
 

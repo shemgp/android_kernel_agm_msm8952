@@ -160,7 +160,6 @@ static struct mutex apps_data_mutex;
 uint16_t diag_debug_mask;
 void *diag_ipc_log;
 #endif
-
 /*
  * Returns the next delayed rsp id. If wrapping is enabled,
  * wraps the delayed rsp id to DIAGPKT_MAX_DELAYED_RSP.
@@ -660,6 +659,7 @@ int diag_cmd_add_reg(struct diag_cmd_reg_entry_t *new_entry, uint8_t proc,
 
 	return 0;
 }
+
 
 struct diag_cmd_reg_entry_t *diag_cmd_search(
 			struct diag_cmd_reg_entry_t *entry, int proc)

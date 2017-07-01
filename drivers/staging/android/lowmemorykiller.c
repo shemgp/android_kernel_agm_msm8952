@@ -50,6 +50,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/almk.h>
 
+
 #ifdef CONFIG_HIGHMEM
 #define _ZONE ZONE_HIGHMEM
 #else
@@ -74,6 +75,7 @@ static int lowmem_minfree_size = 4;
 static int lmk_fast_run = 1;
 
 static unsigned long lowmem_deathpending_timeout;
+
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -195,6 +197,7 @@ static int test_task_flag(struct task_struct *p, int flag)
 
 	return 0;
 }
+
 
 static DEFINE_MUTEX(scan_mutex);
 
@@ -412,6 +415,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			break;
 		}
 	}
+
+
 	if (nr_to_scan > 0) {
 		ret = adjust_minadj(&min_score_adj);
 		lowmem_print(3, "lowmem_shrink %lu, %x, ofree %d %d, ma %hd\n",
@@ -546,7 +551,13 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 
 	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
 		     nr_to_scan, sc->gfp_mask, rem);
+
+	pr_only_buf("lowmem_shrink %lu, %x, return %d\n",
+		     nr_to_scan, sc->gfp_mask, rem);
+
 	mutex_unlock(&scan_mutex);
+
+
 	return rem;
 }
 

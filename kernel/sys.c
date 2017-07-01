@@ -132,6 +132,7 @@ EXPORT_SYMBOL(cad_pid);
 
 void (*pm_power_off_prepare)(void);
 
+
 /*
  * Returns true if current's euid is same as p's uid or euid,
  * or has CAP_SYS_NICE to p's user_ns.
@@ -398,14 +399,19 @@ static void migrate_to_reboot_cpu(void)
  */
 void kernel_restart(char *cmd)
 {
+	printk(KERN_EMERG "kernel_restart_prepare start\n");
 	kernel_restart_prepare(cmd);
+	printk(KERN_EMERG "migrate_to_reboot_cpu start\n");
 	migrate_to_reboot_cpu();
+	printk(KERN_EMERG "syscore_shutdown start\n");
 	syscore_shutdown();
+	printk(KERN_EMERG "kmsg_dump start\n");
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
 	else
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
 	kmsg_dump(KMSG_DUMP_RESTART);
+	printk(KERN_EMERG "machine_restart start\n");
 	machine_restart(cmd);
 }
 EXPORT_SYMBOL_GPL(kernel_restart);
@@ -442,13 +448,18 @@ EXPORT_SYMBOL_GPL(kernel_halt);
  */
 void kernel_power_off(void)
 {
+	printk(KERN_EMERG "kernel_shutdown_prepare start\n");
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
+	printk(KERN_EMERG "pm_power_off_prepare start\n");
 	if (pm_power_off_prepare)
 		pm_power_off_prepare();
+	printk(KERN_EMERG "migrate_to_reboot_cpu start\n");
 	migrate_to_reboot_cpu();
+	printk(KERN_EMERG "syscore_shutdown start\n");
 	syscore_shutdown();
 	printk(KERN_EMERG "Power down.\n");
 	kmsg_dump(KMSG_DUMP_POWEROFF);
+	printk(KERN_EMERG "machine_power_off start\n");
 	machine_power_off();
 }
 EXPORT_SYMBOL_GPL(kernel_power_off);
@@ -469,6 +480,8 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 	struct pid_namespace *pid_ns = task_active_pid_ns(current);
 	char buffer[256];
 	int ret = 0;
+	printk(KERN_EMERG "SYSCALL_REBOOT: cmd=0x%x magic1=0x%x magic2=0x%x\n", 
+		cmd, magic1, magic2);
 
 	/* We only trust the superuser with rebooting the system. */
 	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))

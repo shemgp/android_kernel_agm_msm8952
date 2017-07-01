@@ -90,8 +90,8 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 
 		case CAM_VANA:
 			for (j = 0; j < num_vreg; j++) {
-				if (!strcmp(cam_vreg[j].reg_name, "cam_vana")) {
-					pr_err("%s:%d i %d j %d cam_vana\n",
+				if (!strcmp(cam_vreg[j].reg_name, "cam_ldo_power")) {
+					pr_err("%s:%d i %d j %d cam_ldo_power\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
 					if (VALIDATE_VOLTAGE(
@@ -357,6 +357,12 @@ int msm_sensor_get_sub_module_index(struct device_node *of_node,
 	}
 
 	*s_info = sensor_info;
+
+	for (i = 0; i < SUB_MODULE_MAX; i++) {
+		CDBG("%s:%d subdev_id[%d]=%d \n", __func__, __LINE__, i, sensor_info->subdev_id[i]);		
+		CDBG("%s:%d subdev_intf[%d]=%d \n", __func__, __LINE__, i, sensor_info->subdev_intf[i]);
+	}
+
 	return rc;
 ERROR:
 	kfree(sensor_info);

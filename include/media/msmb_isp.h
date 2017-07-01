@@ -538,11 +538,11 @@ enum msm_isp_event_idx {
 	ISP_FE_RD_DONE        = 8,
 	ISP_IOMMU_P_FAULT     = 9,
 	ISP_ERROR             = 10,
-	ISP_HW_FATAL_ERROR    = 11,
+	ISP_HW_FATAL_ERROR      = 11,
 	ISP_PING_PONG_MISMATCH = 12,
 	ISP_REG_UPDATE_MISSING = 13,
-	ISP_BUF_FATAL_ERROR    = 14,
-	ISP_EVENT_MAX          = 15
+	ISP_BUF_FATAL_ERROR = 14,
+	ISP_EVENT_MAX         = 15
 };
 
 #define ISP_EVENT_OFFSET          8

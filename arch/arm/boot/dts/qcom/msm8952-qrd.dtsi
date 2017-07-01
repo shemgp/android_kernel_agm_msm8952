@@ -12,7 +12,7 @@
  */
 
 #include "msm8952.dtsi"
-#include "msm8952-camera-sensor-qrd.dtsi"
+/*#include "msm8952-camera-sensor-qrd.dtsi"*/ /*Moved to project's msm8952-qrd-skum.dtsi by hisense.*/
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM8952 QRD";
@@ -56,9 +56,11 @@
 	};
 };
 
-&flash_led {
-	qcom,follow-otst2-rb-disabled;
+/*remove it for pmi remove scheme hisense*/
+/*&flash_led {
+       qcom,follow-otst2-rb-disabled;
 };
+*/
 
 &sdhc_1 {
 	vdd-supply = <&pm8950_l8>;

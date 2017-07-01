@@ -1583,6 +1583,7 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 		if (value < FLASH_LED_MIN_CURRENT_MA && value != 0)
 			value = FLASH_LED_MIN_CURRENT_MA;
 		flash_node->prgm_current = value;
+		flash_node->flash_on = value ? true : false;
 	}
 
 	queue_work(led->ordered_workq, &flash_node->work);

@@ -135,9 +135,10 @@ static int fb_event_callback(struct notifier_block *self,
 	}
 
 	pinfo = &ctrl_pdata->panel_data.panel_info;
-
+	/* modify by hisense */
 	if ((!(pinfo->esd_check_enabled) &&
 			dsi_status_disable) ||
+			(!ctrl_pdata->esd_check_switch) ||
 			(dsi_status_disable == DSI_STATUS_CHECK_DISABLE)) {
 		pr_debug("ESD check is disabled.\n");
 		cancel_delayed_work(&pdata->check_status);

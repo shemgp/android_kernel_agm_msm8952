@@ -80,7 +80,18 @@ void power_on_alarm_init(void)
 	else
 		power_on_alarm = 0;
 }
+static int alarm_suspend_or_resume_flag=0;
+int alarm_suspend_or_resume(void)
+{
+	bool is_suspend;
+	is_suspend = alarm_suspend_or_resume_flag;
+	return is_suspend;
+}
 
+void alarm_set_suspend_flag(int input)
+{
+	alarm_suspend_or_resume_flag = input;
+}
 void set_power_on_alarm(long secs, bool enable)
 {
 	int rc;
@@ -378,6 +389,7 @@ static int alarmtimer_suspend(struct device *dev)
 		tm_val = rtc_ktime_to_tm(min);
 		rtc_tm_to_time(&tm_val, &secs);
 		lpm_suspend_wake_time(secs);
+		alarm_set_suspend_flag(1);
 	} else {
 		/* Set alarm, if in the past reject suspend briefly to handle */
 		ret = rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));

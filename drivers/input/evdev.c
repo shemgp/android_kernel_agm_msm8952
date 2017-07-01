@@ -77,14 +77,17 @@ static void __pass_event(struct evdev_client *client,
 		client->buffer[client->tail].value = 0;
 
 		client->packet_head = client->tail;
+		/* hisense delete: use wake lock timeout no need to unlock
 		if (client->use_wake_lock)
 			wake_unlock(&client->wake_lock);
+		*/
 	}
 
 	if (event->type == EV_SYN && event->code == SYN_REPORT) {
 		client->packet_head = client->head;
+		 /*hisense modify: set 200ms wakelock when report a input event*/
 		if (client->use_wake_lock)
-			wake_lock(&client->wake_lock);
+			wake_lock_timeout(&client->wake_lock, HZ/5);
 		kill_fasync(&client->fasync, SIGIO, POLL_IN);
 	}
 }
@@ -407,9 +410,11 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 	if (have_event) {
 		*event = client->buffer[client->tail++];
 		client->tail &= client->bufsize - 1;
+		/* hisense delete: use wake lock timeout no need to unlock
 		if (client->use_wake_lock &&
 		    client->packet_head == client->tail)
 			wake_unlock(&client->wake_lock);
+		*/
 	}
 
 	spin_unlock_irq(&client->buffer_lock);
@@ -707,8 +712,9 @@ static int evdev_enable_suspend_block(struct evdev *evdev,
 	spin_lock_irq(&client->buffer_lock);
 	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, client->name);
 	client->use_wake_lock = true;
+	 /*hisense modify: set 200ms wakelock when report a input event*/
 	if (client->packet_head != client->tail)
-		wake_lock(&client->wake_lock);
+		 wake_lock_timeout(&client->wake_lock, HZ/5);
 	spin_unlock_irq(&client->buffer_lock);
 	return 0;
 }

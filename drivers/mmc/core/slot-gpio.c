@@ -25,6 +25,7 @@ struct mmc_gpio {
 	char cd_label[0]; /* Must be last entry */
 };
 
+
 static int mmc_gpio_get_status(struct mmc_host *host)
 {
 	int ret = -ENOSYS;
@@ -46,7 +47,6 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 	struct mmc_host *host = dev_id;
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	int status;
-
 	/*
 	 * In case host->ops are not yet initialized return immediately.
 	 * The card will get detected later when host driver calls
@@ -69,6 +69,8 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 				"HIGH" : "LOW");
 		ctx->status = status;
 
+		if(host->index == 1)
+			wake_lock_timeout(&host->sd_wake_lock, HZ/2);
 		/* Schedule a card detection after a debounce timeout */
 		mmc_detect_change(host, msecs_to_jiffies(200));
 	}

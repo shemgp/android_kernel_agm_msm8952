@@ -105,7 +105,11 @@ enum msm_usb_phy_type {
 	QUSB_ULPI_PHY,
 };
 
+#ifdef CONFIG_CHG_MAX_CUST
+#define IDEV_CHG_MAX CONFIG_CHG_MAX_CUST
+#else
 #define IDEV_CHG_MAX	1500
+#endif
 #define IDEV_CHG_MIN	500
 #define IUNIT		100
 
@@ -513,6 +517,7 @@ struct msm_otg {
 	bool device_bus_suspend;
 	bool bus_clks_enabled;
 	struct timer_list chg_check_timer;
+	struct timer_list floated_charger_timer;
 	/*
 	 * Allowing PHY power collpase turns off the HSUSB 3.3v and 1.8v
 	 * analog regulators while going to low power mode.

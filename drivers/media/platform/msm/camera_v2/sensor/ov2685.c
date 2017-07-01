@@ -21,6 +21,8 @@
 #define ov2685_obj ov2685_##obj
 #define CCI_I2C_MAX_WRITE 8192
 
+
+
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
@@ -29,46 +31,22 @@ static struct msm_sensor_ctrl_t ov2685_s_ctrl;
 
 static struct msm_sensor_power_setting ov2685_power_setting[] = {
 	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VIO,
-		.config_val = 0,
-		.delay = 1,
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
 	},
 	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VANA,
 		.config_val = 0,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VDIG,
-		.config_val = 0,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_LOW,
 		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_STANDBY,
-		.config_val = GPIO_OUT_LOW,
-		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_STANDBY,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
 	},
 	{
 		.seq_type = SENSOR_CLK,
@@ -76,6 +54,22 @@ static struct msm_sensor_power_setting ov2685_power_setting[] = {
 		.config_val = 24000000,
 		.delay = 10,
 	},
+
+
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 20,
+	},
+	
+
 	{
 		.seq_type = SENSOR_I2C_MUX,
 		.seq_val = 0,
@@ -360,11 +354,15 @@ static struct msm_camera_i2c_reg_conf ov2685_1600x1200p30_settings[] = {
 	{0x581B, 0x0C},
 	{0x3A03, 0x4C},
 	{0x3A04, 0x40},
-	{0x3080, 0x00},
-	{0x3018, 0x44},
-	{0x3084, 0x0F},
-	{0x3085, 0x07},
-	{0x4837, 0x0F},
+	{0x3080, 0x02}, //change for 24fps
+	{0x3082, 0x48}, //change for 24fps
+	{0x3018, 0x44}, //change for 24fps
+	{0x3084, 0x0F}, //change for 24fps
+	{0x3085, 0x06}, //change for 24fps
+	{0x380d, 0xc8}, //change for 24fps
+	{0x380f, 0x10}, //change for 24fps
+	{0x4837, 0x12}, //change for 24fps
+
 	/* FSIN setup */
 	{0x3002, 0x00},
 	{0x3823, 0x30},
@@ -709,6 +707,14 @@ static const struct i2c_device_id ov2685_i2c_id[] = {
 	{ }
 };
 
+
+#if 0
+
+.i2c_read = msm_camera_cci_i2c_read,
+.i2c_read_seq = msm_camera_cci_i2c_read_seq,
+.i2c_write = msm_camera_cci_i2c_write,
+#endif
+
 static int32_t msm_ov2685_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
@@ -760,10 +766,11 @@ static struct platform_driver ov2685_platform_driver = {
 static int __init ov2685_init_module(void)
 {
 	int32_t rc;
+	
 	pr_info("%s:%d\n", __func__, __LINE__);
+
+	
 	rc = platform_driver_register(&ov2685_platform_driver);
-	if (!rc)
-		return rc;
 	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&ov2685_i2c_driver);
 }
@@ -1194,16 +1201,22 @@ int32_t ov2685_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 			s_ctrl->sensordata->sensor_info->is_mount_angle_valid;
 		cdata->cfg.sensor_info.sensor_mount_angle =
 			s_ctrl->sensordata->sensor_info->sensor_mount_angle;
+		cdata->cfg.sensor_info.position =
+			s_ctrl->sensordata->sensor_info->position;
+		
 		CDBG("%s:%d sensor name %s\n", __func__, __LINE__,
 			cdata->cfg.sensor_info.sensor_name);
 		CDBG("%s:%d session id %d\n", __func__, __LINE__,
 			cdata->cfg.sensor_info.session_id);
+		
 		for (i = 0; i < SUB_MODULE_MAX; i++)
 			CDBG("%s:%d subdev_id[%d] %d\n", __func__, __LINE__, i,
 				cdata->cfg.sensor_info.subdev_id[i]);
-		CDBG("%s:%d mount angle valid %d value %d\n", __func__,
+		
+		CDBG("%s:%d mount angle valid %d value %d positon %d\n", __func__,
 			__LINE__, cdata->cfg.sensor_info.is_mount_angle_valid,
-			cdata->cfg.sensor_info.sensor_mount_angle);
+			cdata->cfg.sensor_info.sensor_mount_angle,
+			cdata->cfg.sensor_info.position);
 		break;
 
 	case CFG_GET_SENSOR_INIT_PARAMS:

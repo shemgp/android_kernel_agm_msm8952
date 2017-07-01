@@ -43,6 +43,10 @@
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+extern void subsystem_report(const char *subsys_name, const char *err_log);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
+
 static void log_modem_sfr(void)
 {
 	u32 size;
@@ -62,6 +66,9 @@ static void log_modem_sfr(void)
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+	subsystem_report("modem", smem_reason);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
 	smem_reason[0] = '\0';
 	wmb();
 }
@@ -80,6 +87,7 @@ static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 	if (drv->crash_shutdown || subsys_get_crash_status(drv->subsys))
 		return IRQ_HANDLED;
 
+	pr_only_buf("Fatal error on the modem.\n");
 	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
@@ -187,6 +195,7 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	if (subsys_get_crash_status(drv->subsys))
 		return IRQ_HANDLED;
 
+	pr_only_buf("Watchdog bite received from modem software!\n");
 	pr_err("Watchdog bite received from modem software!\n");
 	if (drv->subsys_desc.system_debug &&
 			!gpio_get_value(drv->subsys_desc.err_fatal_gpio))

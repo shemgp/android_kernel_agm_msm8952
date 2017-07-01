@@ -1454,9 +1454,12 @@ static int gpiod_request(struct gpio_desc *desc, const char *label)
 		spin_lock_irqsave(&gpio_lock, flags);
 	}
 done:
-	if (status)
+	if (status) {
 		pr_debug("_gpio_request: gpio-%d (%s) status %d\n",
 			 desc_to_gpio(desc), label ? : "?", status);
+		pr_only_buf("_gpio_request: gpio-%d (%s) status %d\n",
+			 desc_to_gpio(desc), label ? : "?", status);
+	}
 	spin_unlock_irqrestore(&gpio_lock, flags);
 	return status;
 }
@@ -1665,6 +1668,8 @@ static int gpiod_direction_input(struct gpio_desc *desc)
 		if (status < 0) {
 			pr_debug("GPIO-%d: chip request fail, %d\n",
 				desc_to_gpio(desc), status);
+			pr_only_buf("GPIO-%d: chip request fail, %d\n",
+				desc_to_gpio(desc), status);
 			/* and it's not available to anyone else ...
 			 * gpio_request() is the fully clean solution.
 			 */
@@ -1681,9 +1686,12 @@ lose:
 	return status;
 fail:
 	spin_unlock_irqrestore(&gpio_lock, flags);
-	if (status)
+	if (status) {
 		pr_debug("%s: gpio-%d status %d\n", __func__,
 			 desc_to_gpio(desc), status);
+		pr_only_buf("%s: gpio-%d status %d\n", __func__,
+			 desc_to_gpio(desc), status);
+	}
 	return status;
 }
 
@@ -1734,6 +1742,8 @@ static int gpiod_direction_output(struct gpio_desc *desc, int value)
 		if (status < 0) {
 			pr_debug("GPIO-%d: chip request fail, %d\n",
 				desc_to_gpio(desc), status);
+			pr_only_buf("GPIO-%d: chip request fail, %d\n",
+				desc_to_gpio(desc), status);
 			/* and it's not available to anyone else ...
 			 * gpio_request() is the fully clean solution.
 			 */
@@ -1750,9 +1760,12 @@ lose:
 	return status;
 fail:
 	spin_unlock_irqrestore(&gpio_lock, flags);
-	if (status)
+	if (status) {
 		pr_debug("%s: gpio-%d status %d\n", __func__,
 			 desc_to_gpio(desc), status);
+		pr_only_buf("%s: gpio-%d status %d\n", __func__,
+			 desc_to_gpio(desc), status);
+	}
 	return status;
 }
 

@@ -66,6 +66,10 @@ void __weak panic_smp_self_stop(void)
 		cpu_relax();
 }
 
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+extern void subsystem_report(const char *subsys_name, const char *err_log);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -161,6 +165,10 @@ void panic(const char *fmt, ...)
 	trace_kernel_panic_late(0);
 
 	if (panic_timeout != 0) {
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+		subsystem_report("kernel", "ap panic");
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
+
 		/*
 		 * This will not be a clean reboot, with everything
 		 * shutting down.  But if there is a chance of

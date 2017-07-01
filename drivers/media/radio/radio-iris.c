@@ -49,7 +49,8 @@ static unsigned char c_byt_pair_index;
 static char utf_8_flag;
 static char rt_ert_flag;
 static char formatting_dir;
-static unsigned char sig_blend = CTRL_ON;
+/*Hisense change sig blend to CTRL_OFF*/
+static unsigned char sig_blend = CTRL_OFF;
 static DEFINE_MUTEX(iris_fm);
 
 module_param(rds_buf, uint, 0);
@@ -5139,10 +5140,14 @@ static int iris_fops_release(struct file *file)
 		radio->mode = FM_OFF;
 		retval = hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 						radio->fm_hdev);
+		/* wait for disable cmd resp from controller */
+		msleep(50);
 	} else if (radio->mode == FM_TRANS) {
 		radio->mode = FM_OFF;
 		retval = hci_cmd(HCI_FM_DISABLE_TRANS_CMD,
 					radio->fm_hdev);
+		/* wait for disable cmd resp from controller */
+		msleep(50);
 	} else if (radio->mode == FM_CALIB) {
 		radio->mode = FM_OFF;
 		return retval;

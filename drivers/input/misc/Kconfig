@@ -863,5 +863,79 @@ config SENSORS_ISL29044A
 	help
 	 This option enables support for the INTERSIL ISL29044A P/L sensor.
 
+config HAS_ACC
+	bool "Has Acc sensor"
+	depends on INPUT
+	default false
+
+config ACC_SENSOR_VENDOR
+	string "ACC SENSOR VENDOR"
+	depends on HAS_ACC
+	default ""
+
+config ACC_SENSOR_TYPE
+	string "ACC SENSOR TYPE"
+	depends on HAS_ACC
+	default ""
+
+config HAS_GYRO
+	bool "Has Gyro sensor"
+	depends on INPUT
+	default false
+
+config GYRO_SENSOR_VENDOR
+	string "GYRO SENSOR VENDOR"
+	depends on HAS_GYRO
+	default ""
+
+config GYRO_SENSOR_TYPE
+	string "GYRO SENSOR TYPE"
+	depends on HAS_GYRO
+	default ""
+
+config HAS_MAG
+	bool "Has Mag sensor"
+	depends on INPUT
+	default false
+
+config MAG_SENSOR_VENDOR
+	string "MAG SENSOR VENDOR"
+	depends on HAS_MAG
+	default ""
+
+config MAG_SENSOR_TYPE
+	string "MAG SENSOR TYPE"
+	depends on HAS_MAG
+	default ""
+
+config HAS_ALSP
+	bool "Has Alsp sensor"
+	depends on INPUT
+	default false
+
+config ALSP_SENSOR_VENDOR
+	string "ALSP SENSOR VENDOR"
+	depends on HAS_ALSP
+	default ""
+
+config ALSP_SENSOR_TYPE
+	string "ALSP SENSOR TYPE"
+	depends on HAS_ALSP
+	default ""
+
+config HAS_HALL
+	bool "Has Hall sensor"
+	depends on INPUT
+	default false
+
+config HALL_SENSOR_VENDOR
+	string "HALL SENSOR VENDOR"
+	depends on HAS_HALL
+	default ""
+
+config HALL_SENSOR_TYPE
+	string "HALL SENSOR TYPE"
+	depends on HAS_HALL
+	default ""
 endif
 

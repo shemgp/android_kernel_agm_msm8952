@@ -375,10 +375,15 @@ struct mdss_dsi_ctrl_pdata {
 	int irq_cnt;
 	int disp_te_gpio;
 	int rst_gpio;
+	int vci_en_gpio;
+	/* hisense add */
+	int lcdenp_gpio;
+	int lcdenn_gpio;
 	int disp_en_gpio;
 	int bklt_en_gpio;
 	int mode_gpio;
 	int bklt_ctrl;	/* backlight ctrl */
+	bool dcsbl_dimspeed;/* dcs backlight dim speed ctrl */
 	bool pwm_pmi;
 	int pwm_period;
 	int pwm_pmic_gpio;
@@ -409,6 +414,9 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds post_dms_on_cmds;
 	struct dsi_panel_cmds off_cmds;
 	struct dsi_panel_cmds status_cmds;
+		/*hcmt add for bl dim speed ctrl*/
+	struct dsi_panel_cmds dimspeed_low_cmds;
+	struct dsi_panel_cmds dimspeed_high_cmds;
 	u32 status_cmds_rlen;
 	u32 *status_value;
 	u32 status_error_count;
@@ -479,6 +487,8 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct workqueue_struct *workq;
 	struct delayed_work dba_work;
+	/* add by hisense for esd check */
+	u32 esd_check_switch;
 };
 
 struct dsi_status_data {
@@ -533,6 +543,7 @@ int mdss_dsi_shadow_clk_init(struct platform_device *pdev,
 void mdss_dsi_shadow_clk_deinit(struct device *dev,
 			struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable);
+int mdss_dsi_panel_vci_ctrl(struct mdss_panel_data *pdata, int enable);
 void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);

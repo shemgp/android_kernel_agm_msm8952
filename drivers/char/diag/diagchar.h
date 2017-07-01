@@ -186,6 +186,7 @@
 #define PERIPHERAL_SENSORS	3
 #define NUM_PERIPHERALS		4
 #define APPS_DATA		(NUM_PERIPHERALS)
+#define MODEM_AND_APPS_DATA	5
 
 /*
  * Number of stm processors includes all the peripherals and

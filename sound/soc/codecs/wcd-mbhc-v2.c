@@ -44,15 +44,19 @@
 				  SND_JACK_BTN_2 | SND_JACK_BTN_3 | \
 				  SND_JACK_BTN_4)
 #define OCP_ATTEMPT 1
-#define HS_DETECT_PLUG_TIME_MS (3 * 1000)
+/*Hisense modified*/
+#define HS_DETECT_PLUG_TIME_MS (2 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
-#define GND_MIC_SWAP_THRESHOLD 4
+/*Hisense modified*/
+#define GND_MIC_SWAP_THRESHOLD 2
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
 #define HS_VREF_MIN_VAL 1400
 #define FW_READ_ATTEMPTS 15
 #define FW_READ_TIMEOUT 4000000
 #define FAKE_REM_RETRY_ATTEMPTS 3
+/*Hisense add*/
+#define HS_MEMS_MIC_RETRY_ATTEMPTS 3
 
 static int det_extn_cable_en;
 module_param(det_extn_cable_en, int,
@@ -244,7 +248,6 @@ static int wcd_event_notify(struct notifier_block *self, unsigned long val,
 	enum wcd_notify_event event = (enum wcd_notify_event)val;
 	bool micbias2;
 	bool micbias1;
-
 	pr_debug("%s: event %d\n", __func__, event);
 	micbias2 = (snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MICB_2_EN) & 0x80);
 	micbias1 = (snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MICB_1_EN) & 0x80);
@@ -323,13 +326,20 @@ static int wcd_event_notify(struct notifier_block *self, unsigned long val,
 		break;
 	case WCD_EVENT_PRE_HPHL_PA_ON:
 		set_bit(WCD_MBHC_EVENT_PA_HPHL, &mbhc->event_state);
-		/* check if micbias is enabled */
-		if (micbias2)
-			/* Disable cs, pullup & enable micbias */
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
-		else
-			/* Disable micbias, enable pullup & cs */
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_PULLUP);
+		/*Hisense modified*/
+		if (mbhc->is_hs_inserted)	{
+			/* check if micbias is enabled */
+			if (micbias2)
+				/* Disable cs, pullup & enable micbias */
+				wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+			else
+				/* Disable micbias, enable pullup & cs */
+				wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_PULLUP);
+		}	else { /*Hisense modified*/
+			snd_soc_update_bits(codec,
+					MSM8X16_WCD_A_ANALOG_MBHC_FSM_CTL,
+					0xB0, 0x00);
+		}
 		break;
 	case WCD_EVENT_PRE_HPHR_PA_ON:
 		set_bit(WCD_MBHC_EVENT_PA_HPHR, &mbhc->event_state);
@@ -453,8 +463,11 @@ static void wcd_mbhc_set_and_turnoff_hph_padac(struct wcd_mbhc *mbhc)
 	} else {
 		pr_debug("%s PA is off\n", __func__);
 	}
-	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_RX_HPH_CNP_EN,
+	/*when rx flow has data,do not power of PA*/
+	if (!is_session_playback)
+		snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_RX_HPH_CNP_EN,
 			    0x30, 0x00);
+
 	usleep_range(wg_time * 1000, wg_time * 1000 + 50);
 }
 
@@ -681,7 +694,8 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 	struct snd_soc_codec *codec = mbhc->codec;
 	WCD_MBHC_RSC_ASSERT_LOCKED(mbhc);
 
-	pr_debug("%s: enter insertion %d hph_status %x\n",
+	/*Hisense modified*/
+	pr_info("%s: enter insertion %d hph_status %x\n",
 		 __func__, insertion, mbhc->hph_status);
 	if (!insertion) {
 		/* Report removal */
@@ -706,7 +720,9 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 
 		mbhc->hph_type = WCD_MBHC_HPH_NONE;
 		mbhc->zl = mbhc->zr = 0;
-		pr_debug("%s: Reporting removal %d(%x)\n", __func__,
+		/*Hisense modified*/
+		mbhc->is_hs_inserted = false;
+		pr_info("%s: Reporting removal, jack_type = %d, hph_status = %x\n", __func__,
 			 jack_type, mbhc->hph_status);
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				mbhc->hph_status, WCD_MBHC_JACK_MASK);
@@ -728,7 +744,9 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				mbhc->micbias_enable = false;
 			mbhc->hph_type = WCD_MBHC_HPH_NONE;
 			mbhc->zl = mbhc->zr = 0;
-			pr_debug("%s: Reporting removal (%x)\n",
+			/*Hisense modified*/
+			mbhc->is_hs_inserted = false;
+			pr_info("%s: Reporting removal (%x)\n",
 				 __func__, mbhc->hph_status);
 			wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 					    0, WCD_MBHC_JACK_MASK);
@@ -764,8 +782,7 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		else if (jack_type == SND_JACK_HEADSET) {
 			mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
 			mbhc->jiffies_atreport = jiffies;
-		}
-		else if (jack_type == SND_JACK_LINEOUT)
+		} else if (jack_type == SND_JACK_LINEOUT)
 			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
 
 		if (mbhc->impedance_detect &&
@@ -795,6 +812,9 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
+		/*Hisense modified*/
+		mbhc->is_hs_inserted = true;
+		pr_info("%s: Reporting insertion, type=%d(1:Headphone, 3:Headset, 4:Lineout, 256:GND_MIC_SWAP)\n", __func__,jack_type);
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				    (mbhc->hph_status | SND_JACK_MECHANICAL),
 				    WCD_MBHC_JACK_MASK);
@@ -808,7 +828,8 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 {
 	struct snd_soc_codec *codec = mbhc->codec;
 
-	pr_debug("%s: enter current_plug(%d) new_plug(%d)\n",
+	/*Hisense modified*/
+	pr_info("%s: enter current_plug(%d) new_plug(%d)\n",
 		 __func__, mbhc->current_plug, plug_type);
 
 	WCD_MBHC_RSC_ASSERT_LOCKED(mbhc);
@@ -948,8 +969,8 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 		result2 = snd_soc_read(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_ZDET_ELECT_RESULT);
 		if (!(result2 & 0x01))
-			pr_debug("%s: Special headset detected in %d msecs\n",
-					__func__, (delay * 2));
+			pr_info("%s: Special headset detected in %d msecs\n",
+					__func__, (delay * 2)); /*Hisense modified*/
 		if (delay == SPECIAL_HS_DETECT_TIME_MS) {
 			pr_debug("%s: Spl headset didnt get detect in 4 sec\n",
 					__func__);
@@ -1027,6 +1048,8 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	bool micbias2;
 	bool micbias1;
 	int ret = 0;
+	/*Hisense add*/
+	int retry = 0;
 
 	pr_debug("%s: enter\n", __func__);
 
@@ -1131,6 +1154,16 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 			pr_debug("%s: cable is extension cable\n", __func__);
 			plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
 			wrk_complete = true;
+			/*Hisense modified*/
+			retry++;
+			if (retry > HS_MEMS_MIC_RETRY_ATTEMPTS && (!det_extn_cable_en)) {
+					if (wcd_is_special_headset(mbhc)) {
+							pr_debug("%s: Special headset found %d\n",
+									__func__, plug_type);
+					plug_type = MBHC_PLUG_TYPE_HEADSET;
+					goto report;
+					}
+			}
 		} else {
 			pr_debug("%s: cable might be headset: %d\n", __func__,
 					plug_type);
@@ -1169,8 +1202,8 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	if (plug_type == MBHC_PLUG_TYPE_HIGH_HPH &&
 		(!det_extn_cable_en)) {
 		if (wcd_is_special_headset(mbhc)) {
-			pr_debug("%s: Special headset found %d\n",
-					__func__, plug_type);
+			pr_info("%s: Special headset found %d\n",
+					__func__, plug_type); /*Hisense modified*/
 			plug_type = MBHC_PLUG_TYPE_HEADSET;
 			goto report;
 		}
@@ -1249,7 +1282,16 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 			if (cross_conn > 0) {
 				pr_debug("%s: cross con found, start polling\n",
 					 __func__);
-				plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
+			/*
+			* Hisense, calc impedance to check whether swap or other device for example selfie
+			*/
+				wcd_mbhc_calc_impedance(mbhc,
+					&mbhc->zl, &mbhc->zr);
+				/*selfie need to be deteced as headset*/
+				if (mbhc->zl > 23000 || mbhc->zr > 23000)
+					plug_type = MBHC_PLUG_TYPE_HEADSET;
+				else
+					plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
 				goto exit;
 			}
 		}
@@ -1262,9 +1304,20 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 
 		if (!result1 && !(result2 & 0x01))
 			plug_type = MBHC_PLUG_TYPE_HEADSET;
-		else if (!result1 && (result2 & 0x01))
-			plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
-		else {
+		else if (!result1 && (result2 & 0x01)) {
+			/*
+			* Hisense calc impedance to check whether swap or other device for example selfie
+			*/
+			wcd_mbhc_calc_impedance(mbhc,
+					&mbhc->zl, &mbhc->zr);
+			/*selfie need to be deteced as headset*/
+			if (mbhc->zl > 23000 || mbhc->zr > 23000)
+				plug_type = MBHC_PLUG_TYPE_HEADSET;
+			else if (is_session_playback)
+				plug_type = MBHC_PLUG_TYPE_HEADSET;
+			else
+				plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
+		} else {
 			plug_type = MBHC_PLUG_TYPE_INVALID;
 			goto exit;
 		}
@@ -1279,8 +1332,18 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 exit:
 	pr_debug("%s: Valid plug found, plug type is %d\n",
 			 __func__, plug_type);
-	if (plug_type == MBHC_PLUG_TYPE_HEADSET ||
-			plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
+	if (plug_type == MBHC_PLUG_TYPE_HEADSET)	{
+		/*
+		* Hisense Add to make sure MICB_EN disable and CS mode enable
+		*/
+		wcd_enable_mbhc_supply(mbhc, plug_type);
+		wcd_mbhc_find_plug_and_report(mbhc, plug_type);
+		/*
+		*if plug type is headset , remove correct plug switch,to avoid noise
+		*caused by plug in headset,when camera recording
+		*/
+		/*wcd_schedule_hs_detect_plug(mbhc, &mbhc->correct_plug_swch);*/
+	} else if (plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
 		wcd_mbhc_find_plug_and_report(mbhc, plug_type);
 		wcd_schedule_hs_detect_plug(mbhc, &mbhc->correct_plug_swch);
 	} else {
@@ -1318,6 +1381,8 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	micbias1 = (snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MICB_1_EN) & 0x80);
 	if ((mbhc->current_plug == MBHC_PLUG_TYPE_NONE) &&
 	    detection_type) {
+		/*Hisense add delay time to make headset detection more accurate */
+		msleep(400);
 		/* Make sure MASTER_BIAS_CTL is enabled */
 		snd_soc_update_bits(codec,
 				    MSM8X16_WCD_A_ANALOG_MASTER_BIAS_CTL,
@@ -1419,7 +1484,7 @@ static irqreturn_t wcd_mbhc_mech_plug_detect_irq(int irq, void *data)
 	int r = IRQ_HANDLED;
 	struct wcd_mbhc *mbhc = data;
 
-	pr_debug("%s: enter\n", __func__);
+	pr_info("%s: enter\n", __func__); /*Hisense modified*/
 	if (unlikely(wcd9xxx_spmi_lock_sleep() == false)) {
 		pr_warn("%s: failed to hold suspend\n", __func__);
 		r = IRQ_NONE;
@@ -1670,8 +1735,8 @@ static void wcd_btn_lpress_fn(struct work_struct *work)
 
 	result1 = snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MBHC_BTN_RESULT);
 	if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET) {
-		pr_debug("%s: Reporting long button press event, result1: %d\n",
-			 __func__, result1);
+		pr_info("%s: Reporting long button press event, result1: %d\n",
+			 __func__, result1); /*Hisense modified*/
 		wcd_mbhc_jack_report(mbhc, &mbhc->button_jack,
 				mbhc->buttons_pressed, mbhc->buttons_pressed);
 	}
@@ -1760,6 +1825,8 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 {
 	struct wcd_mbhc *mbhc = data;
 	int ret;
+	/*Hisense add*/
+	u16 result2;
 
 	pr_debug("%s: enter\n", __func__);
 	WCD_MBHC_RSC_LOCK(mbhc);
@@ -1781,6 +1848,12 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 	 * headset not headphone.
 	 */
 	if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE) {
+		/*Hisense modified*/
+		result2 = snd_soc_read(mbhc->codec,
+								MSM8X16_WCD_A_ANALOG_MBHC_ZDET_ELECT_RESULT);
+		pr_info("%s:result2 = 0x%x\n", __func__, result2);
+		if (result2&0x01)
+				mbhc->micbias_enable = true;
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADSET);
 		goto exit;
 
@@ -1788,8 +1861,8 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 	if (mbhc->buttons_pressed & WCD_MBHC_JACK_BUTTON_MASK) {
 		ret = wcd_cancel_btn_work(mbhc);
 		if (ret == 0) {
-			pr_debug("%s: Reporting long button release event\n",
-				 __func__);
+			pr_info("%s: Reporting long button release event\n",
+				 __func__); /*Hisense modified*/
 			wcd_mbhc_jack_report(mbhc, &mbhc->button_jack,
 					0, mbhc->buttons_pressed);
 		} else {
@@ -1797,14 +1870,14 @@ static irqreturn_t wcd_mbhc_release_handler(int irq, void *data)
 				pr_debug("%s: Switch irq kicked in, ignore\n",
 					__func__);
 			} else {
-				pr_debug("%s: Reporting btn press\n",
-					 __func__);
+				pr_info("%s: Reporting btn press, buttons: 0x%x\n",
+					 __func__, mbhc->buttons_pressed); /*Hisense modified*/
 				wcd_mbhc_jack_report(mbhc,
 						     &mbhc->button_jack,
 						     mbhc->buttons_pressed,
 						     mbhc->buttons_pressed);
-				pr_debug("%s: Reporting btn release\n",
-					 __func__);
+				pr_info("%s: Reporting btn release\n",
+					 __func__); /*Hisense modified*/
 				wcd_mbhc_jack_report(mbhc,
 						&mbhc->button_jack,
 						0, mbhc->buttons_pressed);

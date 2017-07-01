@@ -83,6 +83,8 @@ bool mmc_assume_removable = 1;
 #endif
 EXPORT_SYMBOL(mmc_assume_removable);
 module_param_named(removable, mmc_assume_removable, bool, 0644);
+
+
 MODULE_PARM_DESC(
 	removable,
 	"MMC/SD cards are removable and may be removed during suspend");
@@ -2374,7 +2376,8 @@ int mmc_resume_bus(struct mmc_host *host)
 	printk("%s: Starting deferred resume\n", mmc_hostname(host));
 	spin_lock_irqsave(&host->lock, flags);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
-	host->rescan_disable = 0;
+
+		host->rescan_disable = 0;
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	mmc_bus_get(host);
@@ -3829,6 +3832,7 @@ void mmc_rescan(struct work_struct *work)
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
+
 }
 
 void mmc_start_host(struct mmc_host *host)
@@ -4163,6 +4167,7 @@ out:
 
 EXPORT_SYMBOL(mmc_suspend_host);
 
+
 /**
  *	mmc_resume_host - resume a previously suspended host
  *	@host: mmc host
@@ -4171,6 +4176,7 @@ int mmc_resume_host(struct mmc_host *host)
 {
 	int err = 0;
 	ktime_t start = ktime_get();
+
 
 	mmc_bus_get(host);
 	if (mmc_bus_manual_resume(host)) {
@@ -4198,6 +4204,7 @@ int mmc_resume_host(struct mmc_host *host)
 				pm_runtime_enable(&host->card->dev);
 			}
 		}
+
 		BUG_ON(!host->bus_ops->resume);
 		err = host->bus_ops->resume(host);
 		if (err) {
@@ -4207,11 +4214,14 @@ int mmc_resume_host(struct mmc_host *host)
 			err = 0;
 		}
 	}
+
 	host->pm_flags &= ~MMC_PM_KEEP_POWER;
 	mmc_bus_put(host);
 
 	trace_mmc_resume_host(mmc_hostname(host), err,
 			ktime_to_us(ktime_sub(ktime_get(), start)));
+
+
 	return err;
 }
 EXPORT_SYMBOL(mmc_resume_host);
@@ -4294,10 +4304,9 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 			break;
 		}
 		host->rescan_disable = 0;
-		spin_unlock_irqrestore(&host->lock, flags);
-		mmc_detect_change(host, 0);
-		break;
-
+			spin_unlock_irqrestore(&host->lock, flags);
+			mmc_detect_change(host, 0);
+			break;
 	default:
 		return -EINVAL;
 	}

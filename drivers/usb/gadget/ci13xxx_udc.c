@@ -2521,11 +2521,6 @@ __acquires(udc->lock)
 		udc->driver->resume(&udc->gadget);
 		udc->suspended = 0;
 	}
-
-	/*stop charging upon reset */
-	if (udc->transceiver)
-		usb_phy_set_power(udc->transceiver, 100);
-
 	retval = _gadget_stop_activity(&udc->gadget);
 	if (retval)
 		goto done;

@@ -102,6 +102,7 @@ static inline void mark_rodata_ro(void) { }
 extern void tc_init(void);
 #endif
 
+
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -671,14 +672,16 @@ static int __init_or_module do_one_initcall_debug(initcall_t fn)
 	unsigned long long duration;
 	int ret;
 
-	pr_debug("calling  %pF @ %i\n", fn, task_pid_nr(current));
+	/*pr_debug("calling  %pF @ %i\n", fn, task_pid_nr(current)); */ /*delete for hisense*/
 	calltime = ktime_get();
 	ret = fn();
 	rettime = ktime_get();
 	delta = ktime_sub(rettime, calltime);
 	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
-	pr_debug("initcall %pF returned %d after %lld usecs\n",
-		 fn, ret, duration);
+	
+	
+	/*pr_debug("initcall %pF returned %d after %lld usecs\n",
+		 fn, ret, duration);  */ /*delete for hisense*/
 
 	return ret;
 }
@@ -687,6 +690,7 @@ int __init_or_module do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
 	int ret;
+
 
 	if (initcall_debug)
 		ret = do_one_initcall_debug(fn);
@@ -828,6 +832,8 @@ static int __ref kernel_init(void *unused)
 	numa_default_policy();
 
 	flush_delayed_fput();
+
+	printk(KERN_INFO "start init process\n");
 
 	if (ramdisk_execute_command) {
 		if (!run_init_process(ramdisk_execute_command))

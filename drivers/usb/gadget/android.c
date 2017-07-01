@@ -82,7 +82,7 @@ MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
-
+extern int meid_is_null_flag; 
 static const char longname[] = "Gadget Android";
 
 /* Default vendor and product IDs, overridden by userspace */
@@ -230,8 +230,6 @@ static struct android_configuration *alloc_android_config
 						(struct android_dev *dev);
 static void free_android_config(struct android_dev *dev,
 				struct android_configuration *conf);
-static int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum);
-
 /* string IDs are assigned dynamically */
 #define STRING_MANUFACTURER_IDX		0
 #define STRING_PRODUCT_IDX		1
@@ -1433,12 +1431,8 @@ static int diag_function_bind_config(struct android_usb_function *f,
 		notify = NULL;
 		name = strsep(&b, ",");
 		/* Allow only first diag channel to update pid and serial no */
-		if (!once++) {
-			if (dev->pdata && dev->pdata->update_pid_and_serial_num)
-				notify = dev->pdata->update_pid_and_serial_num;
-			else
-				notify = usb_diag_update_pid_and_serial_num;
-		}
+		if (dev->pdata && !once++)
+			notify = dev->pdata->update_pid_and_serial_num;
 
 		if (name) {
 			err = diag_function_add(c, name, notify);
@@ -1950,14 +1944,6 @@ static int mtp_function_ctrlrequest(struct android_usb_function *f,
 	return mtp_ctrlrequest(cdev, c);
 }
 
-static int ptp_function_ctrlrequest(struct android_usb_function *f,
-					struct usb_composite_dev *cdev,
-					const struct usb_ctrlrequest *c)
-{
-	return mtp_ctrlrequest(cdev, c);
-}
-
-
 static struct android_usb_function mtp_function = {
 	.name		= "mtp",
 	.init		= mtp_function_init,
@@ -1972,7 +1958,6 @@ static struct android_usb_function ptp_function = {
 	.init		= ptp_function_init,
 	.cleanup	= ptp_function_cleanup,
 	.bind_config	= ptp_function_bind_config,
-	.ctrlrequest	= ptp_function_ctrlrequest,
 };
 
 /* rndis transport string */
@@ -2424,13 +2409,11 @@ struct mass_storage_function_config {
 static int mass_storage_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
 {
-	struct android_dev *dev = cdev_to_android_dev(cdev);
 	struct mass_storage_function_config *config;
 	struct fsg_common *common;
 	int err;
-	int i, n;
-	char name[FSG_MAX_LUNS][MAX_LUN_NAME];
-	u8 uicc_nluns = dev->pdata ? dev->pdata->uicc_nluns : 0;
+	int i;
+	const char *name[3];
 
 	config = kzalloc(sizeof(struct mass_storage_function_config),
 							GFP_KERNEL);
@@ -2438,31 +2421,12 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		pr_err("Memory allocation failed.\n");
 		return -ENOMEM;
 	}
-
-	config->fsg.nluns = 1;
-	snprintf(name[0], MAX_LUN_NAME, "lun");
-	config->fsg.luns[0].removable = 1;
-
-	if (dev->pdata && dev->pdata->cdrom) {
-		config->fsg.luns[config->fsg.nluns].cdrom = 1;
-		config->fsg.luns[config->fsg.nluns].ro = 1;
-		config->fsg.luns[config->fsg.nluns].removable = 0;
-		snprintf(name[config->fsg.nluns], MAX_LUN_NAME, "rom");
-		config->fsg.nluns++;
-	}
-
-	if (uicc_nluns > FSG_MAX_LUNS - config->fsg.nluns) {
-		uicc_nluns = FSG_MAX_LUNS - config->fsg.nluns;
-		pr_debug("limiting uicc luns to %d\n", uicc_nluns);
-	}
-
-	for (i = 0; i < uicc_nluns; i++) {
-		n = config->fsg.nluns;
-		snprintf(name[n], MAX_LUN_NAME, "uicc%d", i);
-		config->fsg.luns[n].removable = 1;
-		config->fsg.nluns++;
-	}
-
+	config->fsg.nluns = 0;
+	config->fsg.luns[config->fsg.nluns].cdrom = 0;
+	config->fsg.luns[config->fsg.nluns].nofua = 1;
+	config->fsg.luns[config->fsg.nluns].removable = 1;
+	name[config->fsg.nluns] = "lun0";
+	config->fsg.nluns++;
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
 		kfree(config);
@@ -3242,7 +3206,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
-
+		pr_err("####%s:idVendor= 0x%x,idProduct = 0x%x\n", __func__, device_desc.idVendor, device_desc.idProduct);
 		/* Audio dock accessory is unable to enumerate device if
 		 * pull-up is enabled immediately. The enumeration is
 		 * reliable with 100 msec delay.
@@ -3302,6 +3266,43 @@ static ssize_t pm_qos_store(struct device *pdev,
 
 	strlcpy(dev->pm_qos, buff, sizeof(dev->pm_qos));
 
+	return size;
+}
+int charging_only_flag;
+static ssize_t charging_show(struct device *pdev,
+			   struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", charging_only_flag);
+}
+static ssize_t charging_store(struct device *pdev,
+			   struct device_attribute *attr,
+			   const char *buff, size_t size)
+{
+    int charging;
+	sscanf(buff, "%d", &charging);
+	printk("@@@@android.c:%s:charging=%d\n", __func__, charging);
+	if (charging)
+		charging_only_flag = 1;
+	else
+		charging_only_flag = 0;
+	return size;
+}
+static ssize_t cdrom_show(struct device *pdev,
+			   struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", cdrom_flag);
+}
+static ssize_t cdrom_store(struct device *pdev,
+			   struct device_attribute *attr,
+			   const char *buff, size_t size)
+{
+	int cdrom;
+	sscanf(buff, "%d", &cdrom);
+	printk("@@@@android.c:%s:cdrom=%d\n", __func__, cdrom);
+	if (cdrom)
+		cdrom_flag = 1;
+	else
+		cdrom_flag = 0;
 	return size;
 }
 
@@ -3422,7 +3423,10 @@ ANDROID_DEV_ATTR(down_pm_qos_sample_sec, "%u\n");
 ANDROID_DEV_ATTR(up_pm_qos_threshold, "%u\n");
 ANDROID_DEV_ATTR(down_pm_qos_threshold, "%u\n");
 ANDROID_DEV_ATTR(idle_pc_rpm_no_int_secs, "%u\n");
-
+static DEVICE_ATTR(charging, S_IRUGO | S_IWUSR,
+		charging_show, charging_store);
+static DEVICE_ATTR(cdrom, S_IRUGO | S_IWUSR,
+		cdrom_show, cdrom_store);
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
 static DEVICE_ATTR(remote_wakeup, S_IRUGO | S_IWUSR,
 		remote_wakeup_show, remote_wakeup_store);
@@ -3448,6 +3452,8 @@ static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_pm_qos_state,
 	&dev_attr_state,
 	&dev_attr_remote_wakeup,
+	&dev_attr_charging,
+	&dev_attr_cdrom,
 	NULL
 };
 
@@ -3515,19 +3521,18 @@ static int android_bind(struct usb_composite_dev *cdev)
 		return id;
 	strings_dev[STRING_PRODUCT_IDX].id = id;
 	device_desc.iProduct = id;
-
-	/* Default strings - should be updated by userspace */
-	strlcpy(manufacturer_string, "Android",
+	strlcpy(manufacturer_string, CONFIG_HIS_VENDOR_NAME,
 		sizeof(manufacturer_string) - 1);
-	strlcpy(product_string, "Android", sizeof(product_string) - 1);
-	strlcpy(serial_string, "0123456789ABCDEF", sizeof(serial_string) - 1);
-
+	strlcpy(product_string, CONFIG_HIS_VENDOR_NAME, sizeof(product_string) - 1);
+	strlcpy(serial_string, CONFIG_HIS_PRODUCT_NAME, sizeof(serial_string) - 1);
 	id = usb_string_id(cdev);
 	if (id < 0)
 		return id;
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
-
+	if (meid_is_null_flag)
+		device_desc.iSerialNumber = 0;
+	printk("android_bind, serial num is %d\n", device_desc.iSerialNumber);
 	if (gadget_is_otg(cdev->gadget))
 		list_for_each_entry(conf, &dev->configs, list_item)
 			conf->usb_config.descriptors = otg_desc;
@@ -3755,45 +3760,6 @@ static void free_android_config(struct android_dev *dev,
 	dev->configs_num--;
 	kfree(conf);
 }
-
-static int usb_diag_update_pid_and_serial_num(u32 pid, const char *snum)
-{
-	struct dload_struct local_diag_dload = { 0 };
-	int *src, *dst, i;
-
-	if (!diag_dload) {
-		pr_debug("%s: unable to update PID and serial_no\n", __func__);
-		return -ENODEV;
-	}
-
-	pr_debug("%s: dload:%p pid:%x serial_num:%s\n",
-				__func__, diag_dload, pid, snum);
-
-	/* update pid */
-	local_diag_dload.magic_struct.pid = PID_MAGIC_ID;
-	local_diag_dload.pid = pid;
-
-	/* update serial number */
-	if (!snum) {
-		local_diag_dload.magic_struct.serial_num = 0;
-		memset(&local_diag_dload.serial_number, 0,
-				SERIAL_NUMBER_LENGTH);
-	} else {
-		local_diag_dload.magic_struct.serial_num = SERIAL_NUM_MAGIC_ID;
-		strlcpy((char *)&local_diag_dload.serial_number, snum,
-				SERIAL_NUMBER_LENGTH);
-	}
-
-	/* Copy to shared struct (accesses need to be 32 bit aligned) */
-	src = (int *)&local_diag_dload;
-	dst = (int *)diag_dload;
-
-	for (i = 0; i < sizeof(*diag_dload) / 4; i++)
-		*dst++ = *src++;
-
-	return 0;
-}
-
 static int android_probe(struct platform_device *pdev)
 {
 	struct android_usb_platform_data *pdata;

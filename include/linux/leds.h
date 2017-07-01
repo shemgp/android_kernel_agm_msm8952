@@ -24,9 +24,16 @@ struct device;
  */
 
 enum led_brightness {
-	LED_OFF		= 0,
+	LED_OFF 	= 0,
+	LED_TORCH1	   = 31,
+	LED_TORCH2	   = 32,
+	LED_FLASH1	   = 63,
+	LED_FLASH2	   = 64,
+	LED_FULL_FLASH	= 90,
 	LED_HALF	= 127,
 	LED_FULL	= 255,
+	LED_DISABLE = 128, //add by hisense as camera flashlight 2015.5.20
+
 };
 
 struct led_classdev {
@@ -35,7 +42,7 @@ struct led_classdev {
 	int			 max_brightness;
 	int			 usr_brightness_req;
 	int			 flags;
-
+    int 		 position;
 	/* Lower 16 bits reflect status */
 #define LED_SUSPENDED		(1 << 0)
 	/* Upper 16 bits reflect control information */
@@ -47,7 +54,7 @@ struct led_classdev {
 	/* Set LED brightness level */
 	/* Must not sleep, use a workqueue if needed */
 	void		(*brightness_set)(struct led_classdev *led_cdev,
-					  enum led_brightness brightness);
+					  unsigned int);
 	/* Get LED brightness level */
 	enum led_brightness (*brightness_get)(struct led_classdev *led_cdev);
 

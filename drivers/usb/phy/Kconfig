@@ -24,6 +24,13 @@ config USB_OTG_WAKELOCK
 	  Select this to automatically hold a wakelock when USB is
 	  connected, preventing suspend.
 
+config CHG_MAX_CUST
+       int "VBUS Power usage (300-3000 mA)"
+       range 300 3000
+       default 1500
+       help
+           you can set the VBUS current limit whose range is from 300 to 3000 mA.
+
 if USB_PHY
 
 #

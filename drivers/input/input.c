@@ -29,6 +29,8 @@
 #include <linux/rcupdate.h>
 #include "input-compat.h"
 
+extern int usb_charger_online;
+extern void usb_delay_load_all_device(void);
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
 MODULE_LICENSE("GPL");
@@ -426,7 +428,6 @@ void input_event(struct input_dev *dev,
 		 unsigned int type, unsigned int code, int value)
 {
 	unsigned long flags;
-
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);

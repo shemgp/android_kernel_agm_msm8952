@@ -407,8 +407,10 @@ struct i2c_msm_clk_div_fld {
  * divider values as per HW Designers
  */
 static struct i2c_msm_clk_div_fld i2c_msm_clk_div_map[] = {
-	{KHz(100), 124, 62},
-	{KHz(400),  28, 14},
+	/*{KHz(100), 124, 62},*/
+	{KHz(100), 93, 93},
+	/*{KHz(400),  28, 14},*/
+	{KHz(400),  21, 21},
 	{KHz(1000),  8,  5},
 };
 
@@ -2641,8 +2643,8 @@ static int i2c_msm_rsrcs_clk_init(struct i2c_msm_ctrl *ctrl)
 	return 0;
 
 err_set_rate:
-		clk_put(ctrl->rsrcs.core_clk);
-		ctrl->rsrcs.core_clk = NULL;
+	clk_put(ctrl->rsrcs.core_clk);
+	ctrl->rsrcs.core_clk = NULL;
 	return ret;
 }
 

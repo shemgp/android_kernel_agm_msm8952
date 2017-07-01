@@ -39,6 +39,7 @@
 #include <asm/edac.h>
 
 #include <trace/events/exception.h>
+#include <linux/rs_recorder.h>
 
 static const char *fault_name(unsigned int esr);
 
@@ -126,6 +127,9 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 			addr, esr);
 		show_pte(tsk->mm, addr);
 		show_regs(regs);
+#ifdef CONFIG_RS_RECORDER_SUPPORT
+		rs_exec_dump_task("user_fault", 3, __LINE__, false);
+#endif /* CONFIG_RS_RECORDER_SUPPORT */
 	}
 
 	tsk->thread.fault_address = addr;

@@ -25,6 +25,7 @@
 /**
  * enum qpnp_vadc_channels - QPNP AMUX arbiter channels
  */
+
 enum qpnp_vadc_channels {
 	USBIN = 0,
 	DCIN,

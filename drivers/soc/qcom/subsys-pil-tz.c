@@ -746,6 +746,10 @@ static struct pil_reset_ops pil_ops_trusted = {
 	.proxy_unvote = pil_remove_proxy_vote,
 };
 
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+extern void subsystem_report(const char *subsys_name, const char *err_log);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
+
 static void log_failure_reason(const struct pil_tz_data *d)
 {
 	u32 size;
@@ -758,18 +762,25 @@ static void log_failure_reason(const struct pil_tz_data *d)
 	smem_reason = smem_get_entry_no_rlock(d->smem_id, &size, 0,
 							SMEM_ANY_HOST_FLAG);
 	if (!smem_reason || !size) {
+		pr_only_buf("%s SFR: (unknown, smem_get_entry_no_rlock failed).\n",
+									name);
 		pr_err("%s SFR: (unknown, smem_get_entry_no_rlock failed).\n",
 									name);
 		return;
 	}
 	if (!smem_reason[0]) {
+		pr_only_buf("%s SFR: (unknown, empty string found).\n", name);
 		pr_err("%s SFR: (unknown, empty string found).\n", name);
 		return;
 	}
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+	pr_only_buf("%s subsystem failure reason: %s.\n", name, reason);
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
 
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+	subsystem_report("tz", smem_reason);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
 	smem_reason[0] = '\0';
 	wmb();
 }
@@ -840,6 +851,7 @@ static irqreturn_t subsys_err_fatal_intr_handler (int irq, void *dev_id)
 {
 	struct pil_tz_data *d = subsys_to_data(dev_id);
 
+	pr_only_buf("Fatal error on %s!\n", d->subsys_desc.name);
 	pr_err("Fatal error on %s!\n", d->subsys_desc.name);
 	if (subsys_get_crash_status(d->subsys)) {
 		pr_err("%s: Ignoring error fatal, restart in progress\n",
@@ -859,6 +871,7 @@ static irqreturn_t subsys_wdog_bite_irq_handler(int irq, void *dev_id)
 
 	if (subsys_get_crash_status(d->subsys))
 		return IRQ_HANDLED;
+	pr_only_buf("Watchdog bite received from %s!\n", d->subsys_desc.name);
 	pr_err("Watchdog bite received from %s!\n", d->subsys_desc.name);
 
 	if (d->subsys_desc.system_debug &&

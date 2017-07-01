@@ -31,6 +31,7 @@
 		spi0 = &spi_0;
 		i2c2 = &i2c_2;
 		i2c5 = &i2c_5;
+		i2c7 = &i2c_7;
 		i2c8 = &i2c_8;
 		i2c3 = &i2c_3;
 		qup10 = &test_pacman;
@@ -83,6 +84,14 @@
 			label = "qseecom_mem";
 		};
 
+		tzapp_mem: tzapp_region@0 {
+                        linux,reserve-contiguous-region;
+                        linux,reserve-region;
+                        linux,remove-completely;
+                        reg = <0 0x84A00000 0 0x1900000>;
+                        label = "tzapp_mem";
+                };
+
 		cont_splash_mem: splash_region@83000000 {
 			linux,reserve-contiguous-region;
 			linux,reserve-region;
@@ -95,6 +104,13 @@
                         reg = <0 0 0 0x400000>;
                         label = "adsp_mem";
                 };
+		boot_log_mem: boot_log_region@B0000000 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x0 0xB0000000 0x0 0x80000>;
+			label = "boot_log_mem";
+		};
 	};
 
 	aliases {
@@ -120,7 +136,8 @@
 #include "msm8952-iommu-domains.dtsi"
 #include "msm8939-cpu.dtsi"
 #include "msm8952-mdss.dtsi"
-#include "msm8952-pinctrl.dtsi"
+/* delete by hisense
+#include "msm8952-pinctrl.dtsi" */
 #include "msm8952-smp2p.dtsi"
 #include "msm8952-ipcrouter.dtsi"
 #include "msm-gdsc-8916.dtsi"
@@ -402,6 +419,8 @@
 		qcom,governor-per-policy;
 
 		qcom,cpufreq-table-0 =
+			 <  533330 >,
+			 <  800000 >,
 			 <  960000 >,
 			 < 1094400 >,
 			 < 1344000 >,
@@ -409,6 +428,7 @@
 			 < 1516800 >,
 			 < 1651200 >;
 		qcom,cpufreq-table-4 =
+			 <  499200 >,
 			 <  800000 >,
 			 <  998400 >,
 			 < 1094400 >,
@@ -851,6 +871,11 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 
+		download_mode@a94 {
+			compatible = "qcom,msm-imem-download_mode";
+			reg = <0xa94 8>;
+		};
+
 		mem_dump_table@10 {
 			compatible = "qcom,msm-imem-mem_dump_table";
 			reg = <0x10 8>;
@@ -1139,8 +1164,7 @@
 		vbus_otg-supply = <&smbcharger_charger_otg>;
 		qcom,vdd-voltage-level = <0 1200000 1200000>;
 
-		qcom,hsusb-otg-phy-init-seq =
-			<0x73 0x80 0x68 0x81 0x24 0x82 0xffffffff>;
+                qcom,hsusb-otg-phy-init-seq = <0x44 0x80 0x6B 0x81 0x24 0x82 0x13 0x83 0xffffffff>;
 		qcom,hsusb-otg-phy-type = <3>; /* SNPS Femto PHY */
 		qcom,hsusb-otg-mode = <3>; /* OTG mode */
 		qcom,hsusb-otg-otg-control = <2>; /* PMIC */
@@ -1586,9 +1610,9 @@
 		qcom,ce-opp-freq = <100000000>;
 	};
 
-	qcom_seecom: qseecom@85e00000 {
+	qcom_seecom: qseecom@84A00000 {
 		compatible = "qcom,qseecom";
-		reg = <0x85e00000 0x500000>;
+		reg = <0x84A00000 0x1900000>;
 		reg-names = "secapp-region";
 		qcom,hlos-num-ce-hw-instances = <1>;
 		qcom,hlos-ce-hw-instance = <0>;
@@ -1989,6 +2013,31 @@
 		dma-names = "tx", "rx";
 	};
 
+	i2c_7: i2c@7af7000 {
+		compatible = "qcom,i2c-msm-v2";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		reg = <0x7af7000 0x600>;
+		interrupt-names = "qup_irq";
+		interrupts = <0 301 0>;
+		qcom,clk-freq-out = <100000>;
+		qcom,clk-freq-in  = <19200000>;
+		clock-names = "iface_clk", "core_clk";
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup3_i2c_apps_clk>;
+
+		pinctrl-names = "i2c_active", "i2c_sleep";
+		pinctrl-0 = <&i2c_7_active>;
+		pinctrl-1 = <&i2c_7_sleep>;
+		qcom,noise-rjct-scl = <0>;
+		qcom,noise-rjct-sda = <0>;
+		qcom,master-id = <84>;
+		dmas = <&dma_blsp2 8 64 0x20000020 0x20>,
+			<&dma_blsp2 9 32 0x20000020 0x20>;
+		dma-names = "tx", "rx";
+	};
+
 	i2c_8: i2c@7af8000 { /* BLSP2 QUP4 */
 		compatible = "qcom,i2c-msm-v2";
 		#address-cells = <1>;
@@ -2379,7 +2428,10 @@
 
 #include "msm-pm8950-rpm-regulator.dtsi"
 #include "msm-pm8950.dtsi"
-#include "msm-pmi8950.dtsi"
+
+/*remove it for pmi remove scheme hisense*/
+/* #include "msm-pmi8950.dtsi" */
+
 #include "msm8952-regulator.dtsi"
 #include "msm8952-camera.dtsi"
 

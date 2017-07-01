@@ -372,6 +372,7 @@ static void devalarm_triggered(struct devalarm *alarm)
 	uint32_t alarm_type_mask = 1U << alarm->type;
 
 	alarm_dbg(INT, "%s: type %d\n", __func__, alarm->type);
+
 	spin_lock_irqsave(&alarm_slock, flags);
 	if (alarm_enabled & alarm_type_mask) {
 		__pm_wakeup_event(&alarm_wake_lock, 5000); /* 5secs */
@@ -395,7 +396,14 @@ static enum alarmtimer_restart devalarm_alarmhandler(struct alarm *alrm,
 							ktime_t now)
 {
 	struct devalarm *devalrm = container_of(alrm, struct devalarm, u.alrm);
+	static unsigned int number_rtc=0;
 
+	if(1 == alarm_suspend_or_resume())
+	{
+		alarm_set_suspend_flag(0);
+		++number_rtc;
+		printk( "RTC wakeup; type %d;total_rtc_int_number %d\n",devalrm->type,number_rtc);
+	}
 	devalarm_triggered(devalrm);
 	return ALARMTIMER_NORESTART;
 }

@@ -115,6 +115,8 @@ struct irq_chip gic_arch_extn = {
 
 static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
 
+int gic_suspend_flag = 0;
+
 #ifdef CONFIG_GIC_NON_BANKED
 static void __iomem *gic_get_percpu_base(union gic_base *base)
 {
@@ -242,6 +244,8 @@ static int gic_suspend(void)
 	int i;
 	for (i = 0; i < MAX_GIC_NR; i++)
 		gic_suspend_one(&gic_data[i]);
+
+	gic_suspend_flag = 1;
 	return 0;
 }
 
@@ -313,8 +317,9 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 
 		if (desc == NULL)
 			name = "stray irq";
-		else if (desc->action && desc->action->name)
+		else if (desc->action && desc->action->name){
 			name = desc->action->name;
+			}
 
 		pr_warning("%s: %d triggered %s\n", __func__,
 					i + gic->irq_offset, name);
@@ -341,6 +346,8 @@ static void gic_resume(void)
 	int i;
 	for (i = 0; i < MAX_GIC_NR; i++)
 		gic_resume_one(&gic_data[i]);
+
+	
 }
 
 static struct syscore_ops gic_syscore_ops = {
@@ -447,6 +454,12 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	raw_spin_lock(&irq_controller_lock);
 	val = readl_relaxed_no_log(reg) & ~mask;
 	writel_relaxed_no_log(val | bit, reg);
+	if(gic_irq(d)==215)
+		if(readl_relaxed_no_log(reg)!=(val | bit)){
+			writel_relaxed_no_log(val | bit, reg);
+			if(readl_relaxed_no_log(reg)!=(val | bit))
+				pr_err("IRQ 215 affinity migration failed\n");
+		}
 	raw_spin_unlock(&irq_controller_lock);
 
 	return IRQ_SET_MASK_OK;

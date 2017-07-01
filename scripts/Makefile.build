@@ -323,6 +323,11 @@ quiet_cmd_cc_lst_c = MKLST   $@
 $(obj)/%.lst: $(src)/%.c FORCE
 	$(call if_changed_dep,cc_lst_c)
 
+cmd_as_o_obj       = $(LD) $(ld_flags) -r -o $@ $<
+
+$(obj)/%.o: $(src)/%.obj FORCE
+	$(call cmd,as_o_obj)
+
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 

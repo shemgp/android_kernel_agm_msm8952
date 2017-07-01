@@ -31,6 +31,8 @@ struct panel_id {
 #define MDSS_DSI_RST_SEQ_LEN	10
 /* worst case prefill lines for all chipsets including all vertical blank */
 #define MDSS_MDP_MAX_PREFILL_FETCH 25
+/* add for esd reg read */
+#define MDSS_DSI_ESD_CHECK_PARAMS_NUM	8
 
 /* panel type list */
 #define NO_PANEL		0xffff	/* No Panel */
@@ -438,6 +440,8 @@ struct mdss_panel_info {
 	uint32_t panel_dead;
 	u32 panel_force_dead;
 	u32 panel_orientation;
+	/* add for mdp or framework rotate solution config.*/	
+	u32 panel_rotation_type;
 	bool dynamic_switch_pending;
 	bool is_lpm_mode;
 	bool is_split_display;
@@ -456,6 +460,12 @@ struct mdss_panel_info {
 
 	/* debugfs structure for the panel */
 	struct mdss_panel_debugfs_info *debugfs_info;
+	/*modify for esd reg read.*/
+	u32 esd_reg[MDSS_DSI_ESD_CHECK_PARAMS_NUM];
+	u32 esd_reg_num;
+	u32 esd_reg_val[MDSS_DSI_ESD_CHECK_PARAMS_NUM];
+	u32 esd_reg_val_len;
+	/*add end.*/
 };
 
 struct mdss_panel_data {

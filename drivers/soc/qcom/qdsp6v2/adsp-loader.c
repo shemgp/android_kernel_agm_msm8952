@@ -21,11 +21,21 @@
 #include <linux/of_device.h>
 #include <linux/sysfs.h>
 #include <soc/qcom/subsystem_restart.h>
+#include <linux/productinfo.h>
 
 #define Q6_PIL_GET_DELAY_MS 100
 #define BOOT_CMD 1
 #define IMAGE_UNLOAD_CMD 0
+/* Add for sensor ADSP mode*/
+extern uint8_t adsp_mode;
 
+ /* Add for sensor ADSP mode*/
+static ssize_t sns_adsp_mode_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf);
+ /* Add for sensor ADSP mode*/
+static struct kobj_attribute sns_adsp_mode_attribute =
+	__ATTR(adsp_mode, 0440, sns_adsp_mode_show, NULL);
+ 
 static ssize_t adsp_boot_store(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	const char *buf, size_t count);
@@ -41,6 +51,7 @@ static struct kobj_attribute adsp_boot_attribute =
 
 static struct attribute *attrs[] = {
 	&adsp_boot_attribute.attr,
+	&sns_adsp_mode_attribute.attr,
 	NULL,
 };
 
@@ -241,6 +252,33 @@ error_return:
 	return ret;
 }
 
+/* Add for sensor ADSP mode*/
+static ssize_t sns_adsp_mode_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", adsp_mode);
+}
+
+static int ProductInfoRegister(void)
+{
+#if defined(CONFIG_HAS_ACC)
+	productinfo_register(PRODUCTINFO_SENSOR_ACCELEROMETER_ID, CONFIG_ACC_SENSOR_VENDOR, CONFIG_ACC_SENSOR_TYPE);
+#endif
+#if defined(CONFIG_HAS_GYRO)
+	productinfo_register(PRODUCTINFO_SENSOR_GYRO_ID, CONFIG_GYRO_SENSOR_VENDOR, CONFIG_GYRO_SENSOR_TYPE);
+#endif
+#if defined(CONFIG_HAS_MAG)
+	productinfo_register(PRODUCTINFO_SENSOR_COMPASS_ID, CONFIG_MAG_SENSOR_VENDOR, CONFIG_MAG_SENSOR_TYPE);
+#endif
+#if defined(CONFIG_HAS_ALSP)
+	productinfo_register(PRODUCTINFO_SENSOR_ALSPS_ID, CONFIG_ALSP_SENSOR_VENDOR, CONFIG_ALSP_SENSOR_TYPE);
+#endif
+#if defined(CONFIG_HAS_HALL)
+	productinfo_register(PRODUCTINFO_SENSOR_HALL_ID, CONFIG_HALL_SENSOR_VENDOR, CONFIG_HALL_SENSOR_TYPE);
+#endif
+	return 0;
+}
+
 static int adsp_loader_remove(struct platform_device *pdev)
 {
 	struct adsp_loader_private *priv = NULL;
@@ -266,12 +304,13 @@ static int adsp_loader_remove(struct platform_device *pdev)
 
 static int adsp_loader_probe(struct platform_device *pdev)
 {
-	int ret = adsp_loader_init_sysfs(pdev);
+	int ret = 0;
+    ret = adsp_loader_init_sysfs(pdev);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "%s: Error in initing sysfs\n", __func__);
 		return ret;
 	}
-
+    ProductInfoRegister();
 	return 0;
 }
 

@@ -53,6 +53,7 @@
 #include <linux/msm-bus.h>
 #include "msm_serial_hs_hwreg.h"
 
+
 /*
  * There are 3 different kind of UART Core available on MSM.
  * High Speed UART (i.e. Legacy HSUART), GSBI based HSUART
@@ -1959,9 +1960,11 @@ static struct platform_driver msm_hsl_platform_driver = {
 	},
 };
 
+
 static int __init msm_serial_hsl_init(void)
 {
 	int ret;
+
 
 	ret = uart_register_driver(&msm_hsl_uart_driver);
 	if (unlikely(ret))
@@ -1984,7 +1987,10 @@ static void __exit msm_serial_hsl_exit(void)
 {
 	debugfs_remove_recursive(debug_base);
 #ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
+
+ 
 	unregister_console(&msm_hsl_console);
+
 #endif
 	platform_driver_unregister(&msm_hsl_platform_driver);
 	uart_unregister_driver(&msm_hsl_uart_driver);

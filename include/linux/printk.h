@@ -5,6 +5,8 @@
 #include <linux/init.h>
 #include <linux/kern_levels.h>
 #include <linux/linkage.h>
+/* hisense rs recorder module */
+#include <linux/rs_recorder.h>
 
 extern const char linux_banner[];
 extern const char linux_proc_banner[];
@@ -206,6 +208,13 @@ extern void dump_stack(void) __cold;
 #define pr_fmt(fmt) fmt
 #endif
 
+/*add for print err log to private buffer by hisense */
+#define pr_only_buf(fmt, ...)  \
+	save_dev_errinfo(pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_err_buf(fmt, ...) \
+	save_dev_errinfo(pr_fmt(fmt), ##__VA_ARGS__); \
+	printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+
 #define pr_emerg(fmt, ...) \
 	printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_alert(fmt, ...) \
@@ -404,5 +413,9 @@ static inline void oops_printk_start(void)
 {
 }
 #endif
+
+#ifdef CONFIG_SUBSYS_ERR_REPORT
+extern void subsystem_report(const char *subsys_name, const char *err_log);
+#endif /* CONFIG_SUBSYS_ERR_REPORT */
 
 #endif

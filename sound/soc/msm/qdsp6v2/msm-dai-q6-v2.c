@@ -28,6 +28,10 @@
 #include <sound/msm-dai-q6-v2.h>
 #include <sound/pcm_params.h>
 
+#ifdef CONFIG_SND_SOC_TAS2552
+#include "../../codecs/tas2552.h"
+#endif /*CONFIG_SND_SOC_TAS2552*/
+
 #define MSM_DAI_PRI_AUXPCM_DT_DEV_ID 1
 #define MSM_DAI_SEC_AUXPCM_DT_DEV_ID 2
 
@@ -2429,12 +2433,22 @@ static int msm_dai_q6_mi2s_prepare(struct snd_pcm_substream *substream,
 		else
 			set_bit(STATUS_PORT_STARTED,
 				dai_data->status_mask);
+#ifdef CONFIG_SND_SOC_TAS2552
+		if (port_id == AFE_PORT_ID_QUATERNARY_MI2S_RX){
+			tas2552_set_audio_effect();
+			tas2552_do_calibration();
+			tas2552_soft_enable(1);
+			tas2552_set_playback_status(true);
+		}
+#endif /*CONFIG_SND_SOC_TAS2552*/
+
 	}
 	if (!test_bit(STATUS_PORT_STARTED, dai_data->hwfree_status)) {
 		set_bit(STATUS_PORT_STARTED, dai_data->hwfree_status);
 		dev_dbg(dai->dev, "%s: set hwfree_status to started\n",
 				__func__);
 	}
+
 	return rc;
 }
 
@@ -2642,6 +2656,12 @@ static void msm_dai_q6_mi2s_shutdown(struct snd_pcm_substream *substream,
 			__func__, port_id);
 
 	if (test_bit(STATUS_PORT_STARTED, dai_data->status_mask)) {
+#ifdef CONFIG_SND_SOC_TAS2552
+		if (port_id == AFE_PORT_ID_QUATERNARY_MI2S_RX){
+			tas2552_soft_enable(0);
+			tas2552_set_playback_status(false);
+		}
+#endif /*CONFIG_SND_SOC_TAS2552*/
 		rc = afe_close(port_id);
 		if (IS_ERR_VALUE(rc))
 			dev_err(dai->dev, "fail to close AFE port\n");

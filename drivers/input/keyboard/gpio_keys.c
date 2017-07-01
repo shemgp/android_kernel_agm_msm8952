@@ -331,6 +331,8 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+	/* add gpio key code print log */
+	pr_err("%s: gpio keys code %d sts %d\n", __func__, button->code, state);
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -905,7 +907,8 @@ static int gpio_keys_resume(struct device *dev)
 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
 	struct input_dev *input = ddata->input;
 	int error = 0;
-	int i;
+	int i = 0;
+	int state = 0, other_state = 0;
 
 	if (ddata->key_pinctrl) {
 		error = gpio_keys_pinctrl_configure(ddata, true);
@@ -930,6 +933,21 @@ static int gpio_keys_resume(struct device *dev)
 
 	if (error)
 		return error;
+
+	/* hmct change*/
+	for (i = 0; i < ddata->pdata->nbuttons; i++) {
+		struct gpio_button_data *bdata = &ddata->data[i];
+		if (bdata->button->code == 115)
+			state = (gpio_get_value_cansleep(bdata->button->gpio) ? 1 : 0) ^ bdata->button->active_low;
+		else
+			other_state = other_state|((gpio_get_value_cansleep(bdata->button->gpio) ? 1 : 0) ^ bdata->button->active_low);
+	}
+
+	/* only press volume up key to delete the report state
+	     in order to fix the function of opening flash with two
+	     time pressed the key*/
+	if((other_state == 0) && (state == 1))
+		return 0;
 
 	gpio_keys_report_state(ddata);
 	return 0;

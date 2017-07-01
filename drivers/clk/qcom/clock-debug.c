@@ -669,8 +669,7 @@ out:
  */
 void clock_debug_print_enabled(void)
 {
-	if (likely(!debug_suspend))
-		return;
+	
 
 	clock_debug_print_enabled_clocks(NULL);
 }

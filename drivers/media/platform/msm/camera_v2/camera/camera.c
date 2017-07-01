@@ -26,6 +26,8 @@
 #include <linux/msm_ion.h>
 #include <linux/iommu.h>
 #include <linux/platform_device.h>
+#include <linux/debugfs.h>
+
 #include <media/v4l2-fh.h>
 
 #include "camera.h"
@@ -41,6 +43,11 @@ struct camera_v4l2_private {
 	unsigned int is_vb2_valid; /*0 if no vb2 buffers on stream, else 1*/
 	struct vb2_queue vb2_q;
 };
+
+
+static struct dentry *hsn_camera_dbg_root = NULL;
+
+
 
 static void camera_pack_event(struct file *filep, int evt_id,
 	int command, int value, struct v4l2_event *event)
@@ -821,3 +828,23 @@ video_fail:
 init_end:
 	return rc;
 }
+
+
+
+struct dentry *camera_dbg_root(void){
+	
+	if (!hsn_camera_dbg_root){		
+		hsn_camera_dbg_root = debugfs_create_dir("camera_dbg", NULL);
+		if(!hsn_camera_dbg_root){
+			pr_err("%s:%d debugfs_create_dir camera fail!\n", __func__, __LINE__);
+			return NULL;
+		}
+	}
+	return hsn_camera_dbg_root;
+}
+
+
+EXPORT_SYMBOL(camera_dbg_root);
+
+
+

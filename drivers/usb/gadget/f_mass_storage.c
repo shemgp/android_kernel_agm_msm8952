@@ -220,6 +220,8 @@
 
 #include "gadget_chips.h"
 
+#define CDROM_FUNCTION_NAME "cdrom"
+int cdrom_flag = 1;
 
 /*------------------------------------------------------------------------*/
 
@@ -582,9 +584,8 @@ static int fsg_setup(struct usb_function *f,
 		if (w_index != fsg->interface_number || w_value != 0 ||
 				w_length != 1)
 			return -EDOM;
-		VDBG(fsg, "get max LUN\n");
-		*(u8 *)req->buf = fsg->common->nluns - 1;
-
+		printk("fsg_setup:get max LUN=%d, cdrom_flag=%d\n", fsg->common->nluns, cdrom_flag);
+		*(u8 *)req->buf = 0;
 		/* Respond with data/status */
 		req->length = min((u16)1, w_length);
 		return ep0_queue(fsg->common);
@@ -857,7 +858,7 @@ static int do_write(struct fsg_common *common)
 #ifdef CONFIG_USB_MSC_PROFILING
 	ktime_t			start, diff;
 #endif
-	if (curlun->ro) {
+	if (cdrom_flag) {
 		curlun->sense_data = SS_WRITE_PROTECTED;
 		return -EINVAL;
 	}
@@ -1244,8 +1245,7 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf[4] = 31;		/* Additional length */
 		return 36;
 	}
-
-	buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
+	buf[0] = cdrom_flag ? TYPE_ROM : TYPE_DISK;
 	buf[1] = curlun->removable ? 0x80 : 0;
 	buf[2] = 2;		/* ANSI SCSI level 2 */
 	buf[3] = 2;		/* SCSI-2 INQUIRY data format */
@@ -1253,7 +1253,14 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
-	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
+    printk("do_inquiry: curlun->cdrom=%d,curlun->ro=%d\n", curlun->cdrom, curlun->ro);
+	if (cdrom_flag) {
+		sprintf(buf+8, "%-8s%-16s",
+			CONFIG_USB_CDROM_NAME, CDROM_FUNCTION_NAME);
+	} else {
+		sprintf(buf+8, "%-8s%-16s",
+			CONFIG_HIS_VENDOR_NAME, fsg_string_interface);
+	}
 	return 36;
 }
 
@@ -1357,25 +1364,29 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	int		msf = common->cmnd[1] & 0x02;
 	int		start_track = common->cmnd[6];
 	u8		*buf = (u8 *)bh->buf;
+	u8		format;
+	int		ret;
 
 	if ((common->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
 			start_track > 1) {
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
+	format = common->cmnd[2] & 0xf;
+	/*
+	* Check if CDB is old style SFF-8020i
+	* i.e. format is in 2 MSBs of byte 9
+	* Mac OS-X host sends us this.
+	*/
 
-	memset(buf, 0, 20);
-	buf[1] = (20-2);		/* TOC data length */
-	buf[2] = 1;			/* First track number */
-	buf[3] = 1;			/* Last track number */
-	buf[5] = 0x16;			/* Data track, copying allowed */
-	buf[6] = 0x01;			/* Only track is number 1 */
-	store_cdrom_address(&buf[8], msf, 0);
+	if (format == 0)
+		format = (common->cmnd[9] >> 6) & 0x3;
 
-	buf[13] = 0x16;			/* Lead-out track is data */
-	buf[14] = 0xAA;			/* Lead-out track number */
-	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
-	return 20;
+	ret = fsg_get_toc(curlun, msf, format, buf);
+	if (ret < 0)
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+
+	return ret;
 }
 
 static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1410,11 +1421,11 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 */
 	memset(buf, 0, 8);
 	if (mscmnd == MODE_SENSE) {
-		buf[2] = (curlun->ro ? 0x80 : 0x00);		/* WP, DPOFUA */
+		buf[2] = (cdrom_flag ? 0x80 : 0x00);		/* WP, DPOFUA */
 		buf += 4;
 		limit = 255;
 	} else {			/* MODE_SENSE_10 */
-		buf[3] = (curlun->ro ? 0x80 : 0x00);		/* WP, DPOFUA */
+		buf[3] = (cdrom_flag ? 0x80 : 0x00);		/* WP, DPOFUA */
 		buf += 8;
 		limit = 65535;		/* Should really be FSG_BUFLEN */
 	}
@@ -2121,7 +2132,7 @@ static int do_scsi_command(struct fsg_common *common)
 		break;
 
 	case READ_HEADER:
-		if (!common->curlun || !common->curlun->cdrom)
+		if (!common->curlun || !cdrom_flag)
 			goto unknown_cmnd;
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
@@ -2133,12 +2144,12 @@ static int do_scsi_command(struct fsg_common *common)
 		break;
 
 	case READ_TOC:
-		if (!common->curlun || !common->curlun->cdrom)
+		if (!common->curlun || !cdrom_flag)
 			goto unknown_cmnd;
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (7<<6) | (1<<1), 1,
+				      (0xf<<6) | (1<<1), 1,
 				      "READ TOC");
 		if (reply == 0)
 			reply = do_read_toc(common, bh);
@@ -2896,7 +2907,7 @@ static int create_lun_device(struct fsg_common *common,
 				pr_err("failed to open lun file.\n");
 				goto error_luns;
 			}
-		} else if (!curlun->removable && !curlun->cdrom) {
+		} else if (!curlun->removable && !cdrom_flag) {
 			ERROR(common, "no file given for LUN%d\n", i);
 			rc = -EINVAL;
 			goto error_luns;
