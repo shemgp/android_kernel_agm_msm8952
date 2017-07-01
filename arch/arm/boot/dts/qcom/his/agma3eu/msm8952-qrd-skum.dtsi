@@ -89,6 +89,7 @@
 		synaptics,power-down;
 		synaptics,disable-gpios;
 		synaptics,button-map = <139 172 158>;
+		synaptics,fw-image-version-offset = <0x16d00>;
 	};
 	goodix@5d {
 		compatible = "goodix,gt1x";
@@ -479,6 +480,7 @@
 
 #include "dsi-panel-otm1287a-booyi-720p-video.dtsi"
 #include "dsi-panel-s6e3fa3-samsung-1080p-cmd.dtsi"
+#include "dsi-panel-rm67191-edo-1080p-cmd.dtsi"
 #include "msm8952-mdss-panels.dtsi"
 
 
