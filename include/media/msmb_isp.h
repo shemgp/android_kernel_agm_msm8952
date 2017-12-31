@@ -14,20 +14,4 @@
 
 #include <uapi/media/msmb_isp.h>
 
-#ifdef CONFIG_COMPAT
-struct msm_isp_event_data32 {
-	struct compat_timeval timestamp;
-	struct compat_timeval mono_timestamp;
-	uint32_t frame_id;
-	union {
-		struct msm_isp_stats_event stats;
-		struct msm_isp_buf_event buf_done;
-		struct msm_isp_fetch_eng_event fetch_done;
-		struct msm_isp_error_info error_info;
-		struct msm_isp_output_info output_info;
-		struct msm_isp_sof_info sof_info;
-	} u;
-};
-#endif
-
 #endif

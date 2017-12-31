@@ -16,18 +16,6 @@
 #include <linux/compat.h>
 
 #ifdef CONFIG_COMPAT
-/*
- * struct msm_fd_result32 - Compat structure contain detected faces result.
- * @frame_id: Frame id of requested result.
- * @face_cnt: Number of result faces, driver can modify this value (to smaller)
- * @face_data: Pointer to array of face data structures.
- *  Array size should not be smaller then face_cnt.
- */
-struct msm_fd_result32 {
-	__u32 frame_id;
-	__u32 face_cnt;
-	compat_uptr_t face_data;
-};
 
 /* MSM FD compat private ioctl ID */
 #define VIDIOC_MSM_FD_GET_RESULT32 \

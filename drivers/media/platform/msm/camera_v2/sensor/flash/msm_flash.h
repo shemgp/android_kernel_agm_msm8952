@@ -15,6 +15,7 @@
 
 #include <linux/leds.h>
 #include <linux/platform_device.h>
+#include <linux/wakelock.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-ioctl.h>
 #include <media/msm_cam_sensor.h>
@@ -42,6 +43,10 @@ struct msm_flash_func_t {
 		struct msm_flash_cfg_data_t *);
 	int32_t (*camera_flash_high)(struct msm_flash_ctrl_t *,
 		struct msm_flash_cfg_data_t *);
+    
+    int32_t (*camera_flash_clear_status)(struct msm_flash_ctrl_t *);
+    void (*camera_flash_power_on)(struct msm_flash_ctrl_t *);
+    void (*camera_flash_power_down)(struct msm_flash_ctrl_t *);
 };
 
 struct msm_flash_table {
@@ -55,14 +60,23 @@ struct msm_flash_reg_t {
 	struct msm_camera_i2c_reg_setting *release_setting;
 	struct msm_camera_i2c_reg_setting *low_setting;
 	struct msm_camera_i2c_reg_setting *high_setting;
+	struct msm_camera_i2c_reg_setting *clear_status; //Add by hisense
+	struct msm_camera_i2c_reg_setting *led1_low_setting;
+    struct msm_camera_i2c_reg_setting *led2_low_setting;
+    struct msm_camera_i2c_reg_setting *led1_high_setting;
+    struct msm_camera_i2c_reg_setting *led2_high_setting;
 };
 
-struct msm_flash_ctrl_t {
+struct msm_flash_ctrl_t {	
+	const char *flash_name;
 	struct msm_camera_i2c_client flash_i2c_client;
 	struct msm_sd_subdev msm_sd;
 	struct platform_device *pdev;
 	struct msm_flash_func_t *func_tbl;
 	struct msm_camera_power_ctrl_t power_info;
+
+	struct msm_camera_slave_info *slave_info; //Add by hisense
+	struct msm_flash_reg_t *reg_setting; // Add by hisense
 
 	/* Switch node to trigger led */
 	const char *switch_trigger_name;
@@ -75,13 +89,17 @@ struct msm_flash_ctrl_t {
 	uint32_t flash_op_current[MAX_LED_TRIGGERS];
 	uint32_t flash_max_current[MAX_LED_TRIGGERS];
 	uint32_t flash_max_duration[MAX_LED_TRIGGERS];
-
+	uint32_t flash_max_timeout[MAX_LED_TRIGGERS]; //Add by hisense
+	uint32_t flash_op_timeout[MAX_LED_TRIGGERS];//Add by hisense
+	
 	/* Torch */
 	uint32_t torch_num_sources;
 	const char *torch_trigger_name[MAX_LED_TRIGGERS];
 	struct led_trigger *torch_trigger[MAX_LED_TRIGGERS];
 	uint32_t torch_op_current[MAX_LED_TRIGGERS];
 	uint32_t torch_max_current[MAX_LED_TRIGGERS];
+	
+	uint32_t enable;//Add by hisense
 
 	void *data;
 	enum msm_camera_device_type_t flash_device_type;
@@ -95,12 +113,20 @@ struct msm_flash_ctrl_t {
 
 	/* flash state */
 	enum msm_camera_flash_state_t flash_state;
+	enum msm_camera_led_config_t led_state;
+
+	/*Add by hisense Berry*/
+	struct led_classdev led_cl_dev; 
+	struct wake_lock	torch_wake_lock;
+    bool front_flash_node;
 };
 
 int msm_flash_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id);
 
-int msm_flash_probe(struct platform_device *pdev, const void *data);
+
+int32_t msm_flash_platform_probe(struct platform_device *pdev, const void *data);
+
 
 int32_t msm_flash_create_v4lsubdev(struct platform_device *pdev,
 	void *data);
@@ -117,4 +143,10 @@ int msm_flash_led_release(struct msm_flash_ctrl_t *fctrl);
 int msm_flash_led_off(struct msm_flash_ctrl_t *fctrl);
 int msm_flash_led_low(struct msm_flash_ctrl_t *fctrl);
 int msm_flash_led_high(struct msm_flash_ctrl_t *fctrl);
+
+void msm_flash_i2c_rear_brightness_set(struct led_classdev *led_cdev,
+				unsigned int value);
+void msm_flash_i2c_front_brightness_set(struct led_classdev *led_cdev,
+				unsigned int value);
+
 #endif

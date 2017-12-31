@@ -1,6 +1,12 @@
 #ifndef __UAPI_MSMB_PPROC_H
 #define __UAPI_MSMB_PPROC_H
 
+#ifdef MSM_CAMERA_BIONIC
+#include <sys/types.h>
+#endif
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
+#endif
 #include <linux/videodev2.h>
 #include <linux/types.h>
 #include <media/msmb_generic_buf_mgr.h>
@@ -250,5 +256,71 @@ struct msm_camera_v4l2_ioctl_t {
 	void __user *ioctl_ptr;
 };
 
+#ifdef CONFIG_COMPAT
+
+#define VIDIOC_MSM_CPP_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_GET_EVENTPAYLOAD32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 1, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_GET_INST_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 2, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_LOAD_FIRMWARE32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 3, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_GET_HW_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 4, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_FLUSH_QUEUE32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 5, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_ENQUEUE_STREAM_BUFF_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 6, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_DEQUEUE_STREAM_BUFF_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 7, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_TRANSACTION_SETUP32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 9, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_GET_EVENTPAYLOAD32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_GET_INST_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_ENQUEUE_STREAM_BUFF_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_VPE_DEQUEUE_STREAM_BUFF_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 13, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_QUEUE_BUF32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 14, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_APPEND_STREAM_BUFF_INFO32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 15, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_SET_CLOCK32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 16, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_POP_STREAM_BUFFER32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 17, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_IOMMU_ATTACH32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 18, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_IOMMU_DETACH32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 19, struct msm_camera_v4l2_ioctl32_t)
+
+#define VIDIOC_MSM_CPP_DELETE_STREAM_BUFF32\
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 20, struct msm_camera_v4l2_ioctl32_t)
+
 #endif
 
+#endif /* __UAPI_MSMB_PPROC_H */

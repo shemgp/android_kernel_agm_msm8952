@@ -21,6 +21,8 @@
 #define ov2685_obj ov2685_##obj
 #define CCI_I2C_MAX_WRITE 8192
 
+
+
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
@@ -29,52 +31,22 @@ static struct msm_sensor_ctrl_t ov2685_s_ctrl;
 
 static struct msm_sensor_power_setting ov2685_power_setting[] = {
 	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VIO,
-		.config_val = 0,
-		.delay = 1,
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
 	},
 	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VANA,
 		.config_val = 0,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VDIG,
-		.config_val = 0,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_VDIG,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_LOW,
 		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_STANDBY,
-		.config_val = GPIO_OUT_LOW,
-		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_STANDBY,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
 	},
 	{
 		.seq_type = SENSOR_CLK,
@@ -82,6 +54,22 @@ static struct msm_sensor_power_setting ov2685_power_setting[] = {
 		.config_val = 24000000,
 		.delay = 10,
 	},
+
+
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 20,
+	},
+	
+
 	{
 		.seq_type = SENSOR_I2C_MUX,
 		.seq_val = 0,
@@ -366,11 +354,15 @@ static struct msm_camera_i2c_reg_conf ov2685_1600x1200p30_settings[] = {
 	{0x581B, 0x0C},
 	{0x3A03, 0x4C},
 	{0x3A04, 0x40},
-	{0x3080, 0x00},
-	{0x3018, 0x44},
-	{0x3084, 0x0F},
-	{0x3085, 0x07},
-	{0x4837, 0x0F},
+	{0x3080, 0x02}, //change for 24fps
+	{0x3082, 0x48}, //change for 24fps
+	{0x3018, 0x44}, //change for 24fps
+	{0x3084, 0x0F}, //change for 24fps
+	{0x3085, 0x06}, //change for 24fps
+	{0x380d, 0xc8}, //change for 24fps
+	{0x380f, 0x10}, //change for 24fps
+	{0x4837, 0x12}, //change for 24fps
+
 	/* FSIN setup */
 	{0x3002, 0x00},
 	{0x3823, 0x30},
@@ -715,6 +707,382 @@ static const struct i2c_device_id ov2685_i2c_id[] = {
 	{ }
 };
 
+
+
+#define OV2685_DBG_DATA_SIZE 128
+static uint8_t ov2685_data_buf[OV2685_DBG_DATA_SIZE];
+
+static struct dentry *ov2685_dbg_root = NULL;
+
+#if 0
+
+.i2c_read = msm_camera_cci_i2c_read,
+.i2c_read_seq = msm_camera_cci_i2c_read_seq,
+.i2c_write = msm_camera_cci_i2c_write,
+#endif
+
+static uint8_t ov2685_i2c_read(uint32_t addr)
+{
+	struct msm_sensor_ctrl_t *s_ctrl = &ov2685_s_ctrl;
+	uint16_t data;
+	int rc;
+	
+	rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+		s_ctrl->sensor_i2c_client, addr, &data, MSM_CAMERA_I2C_BYTE_DATA);
+	if(rc < 0){
+		pr_err("%s addr=0x%x fail!\n", __func__, addr);
+		return 0xFF;
+	}
+
+	pr_err("%s addr=0x%x = 0x%x ok.\n", __func__, addr, data);
+	return (uint8_t)data;	
+}
+
+
+static int ov2685_i2c_write(uint32_t addr, uint16_t data)
+{
+	struct msm_sensor_ctrl_t *s_ctrl = &ov2685_s_ctrl;
+	int rc;
+	
+	rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+		s_ctrl->sensor_i2c_client, addr, data, MSM_CAMERA_I2C_BYTE_DATA);
+	if(rc < 0){
+		pr_err("%s addr=0x%x -> 0x%x  fail!\n", __func__, addr, data);
+		return -1;
+	}
+
+	pr_err("%s addr=0x%x -> 0x%x ok.\n", __func__, addr, data);
+	return 0;	
+}
+
+
+
+static int ov2685_dbg_open(struct inode *inode, struct file *filp)
+{
+	pr_err("%s Enter.\n", __func__);
+	filp->private_data = inode->i_private;
+	return 0;
+}
+
+static int ov2685_get_HTS(void)
+{
+	// read HTS from register settings
+	int HTS;
+	HTS = ov2685_i2c_read(0x380c);
+	HTS = (HTS<<8) + ov2685_i2c_read(0x380d);
+	return HTS;
+}
+
+static int ov2685_get_VTS(void)
+{
+	// read VTS from register settings
+	int VTS;
+	VTS = ov2685_i2c_read(0x380e);
+	VTS = (VTS<<8) + ov2685_i2c_read(0x380f);
+	return VTS;
+}
+
+
+static int ov2685_set_VTS(int VTS)
+{
+	int temp;
+	
+	temp = VTS & 0xff;
+	ov2685_i2c_write(0x380f, temp);
+	temp = VTS>>8;
+	ov2685_i2c_write(0x380e, temp);
+	return 0;
+}
+
+
+static int ov2685_get_sysclk(void)
+{
+	// calculate sysclk
+	int XVCLK = 2400;
+	int sysclk, temp1, temp2;
+	int Pre_div0, Pre_div2x, Div_loop, SP_Div, SysDiv, VCO;
+	int Pre_div2x_map[] = {	2, 3, 4, 5, 6, 8, 12, 16};
+	
+	temp1 = ov2685_i2c_read(0x3088);
+	temp2 = (temp1>>4) & 0x01;
+	Pre_div0 = temp2 + 1;
+	temp1 = ov2685_i2c_read(0x3080);
+	temp2 = temp1 & 0x07;
+	Pre_div2x = Pre_div2x_map[temp2];
+	temp1 = ov2685_i2c_read(0x3081);
+	Div_loop = ((temp1 & 0x03)<<8) + ov2685_i2c_read(0x3082);
+	temp1 = ov2685_i2c_read(0x3086);
+	temp2 = temp1 & 0x07;
+	SP_Div = temp2 + 1;
+	temp1 = ov2685_i2c_read(0x3084);
+	temp2 = temp1 & 0x0f;
+	SysDiv = temp2 + 1;
+	VCO = XVCLK * Div_loop * 2 / Pre_div0 / Pre_div2x;
+	sysclk = VCO / SP_Div / SysDiv ;
+	// Check sysclk
+	//temp1 = sysclk & 0xff;
+	//temp2 = sysclk>>8;
+	//OV2685_write_i2c(0x500b, temp1);
+	//OV2685_write_i2c(0x500d, temp2);
+	return sysclk;
+
+}
+
+
+static int ov2685_set_gain(int gain16)
+{
+	// write gain, 16 = 1x
+	int temp;
+	if(gain16 > 0x7ff)
+		gain16 = 0x7ff;
+	
+	gain16 = gain16 & 0x7ff;
+	temp = gain16 & 0xff;
+	ov2685_i2c_write(0x350b, temp);
+	temp = gain16>>8;
+	ov2685_i2c_write(0x350a, temp);
+	return 0;
+}
+
+
+static int ov2685_set_shutter(int shutter)
+{
+	// write shutter, in number of line period
+	int temp;
+	if(shutter > 0xffff){
+		shutter = 0xffff;
+	}
+	shutter = shutter & 0xffff;
+	temp = shutter & 0x0f;
+	temp = temp<<4;
+	ov2685_i2c_write(0x3502, temp);
+	temp = shutter & 0xfff;
+	temp = temp>>4;
+	ov2685_i2c_write(0x3501, temp);
+	temp = shutter>>12;
+	ov2685_i2c_write(0x3500, temp);
+	return 0;
+}
+
+const int ov2685_VTS = 1294;
+
+static int ov2685_set_ae(int set_time, int set_gain)
+{
+
+//	int sys_clk;
+	int HTS, VTS;
+	uint8_t aec_enable;
+	uint8_t shtr3500, shtr3501, shtr3502;
+	uint16_t shtr;
+	uint8_t gain350a,gain350b;
+	uint16_t gain;
+//	int exp_time;
+//	int set_shutter;
+	
+	#if 0
+	if(MSM_SENSOR_POWER_DOWN == ov2685_s_ctrl.sensor_state)	{
+		pr_err("%s fail. sensor_state=%d\n", __func__, ov2685_s_ctrl.sensor_state);
+		return -1;
+	}
+	#endif
+	
+	pr_err("%s Enter. time=%d  gain=%d\n", __func__, set_time, set_gain);
+
+#if 0
+	sys_clk = ov2685_get_sysclk();
+	pr_err("%s cur sys_clk = %d\n", __func__, sys_clk);
+#endif
+
+	HTS = ov2685_get_HTS();	
+	pr_err("%s cur HTS = %d\n", __func__, HTS);
+	
+	VTS = ov2685_get_VTS();
+	pr_err("%s cur VTS = %d\n", __func__, VTS);
+	
+#if 0
+	shtr3500 = ov2685_i2c_read(0x3500);
+	shtr3501 = ov2685_i2c_read(0x3501);
+	shtr3502 = ov2685_i2c_read(0x3502);
+	shtr = (shtr3500 << 12) + (shtr3501 << 4) + (shtr3502 >> 4);
+
+	pr_err("%s cur shutter = %d\n", __func__, shtr);
+
+	
+	gain350a = ov2685_i2c_read(0x350a);
+	gain350b = ov2685_i2c_read(0x350b);
+
+	gain = ((gain350a & 0x07) << 8) + (gain350b);
+	pr_err("%s cur gain = %d\n", __func__, gain * 10 / 16);
+
+    exp_time = shtr * HTS / sys_clk;
+	pr_err("%s cur exp_time = %d ms\n", __func__, exp_time/10);
+#endif
+
+	aec_enable = ov2685_i2c_read(0x3503);	
+	ov2685_i2c_write(0x3503, aec_enable | 0x03);
+	
+	aec_enable = ov2685_i2c_read(0x3a00);
+	ov2685_i2c_write(0x3a00, aec_enable & 0xfe);
+
+//	set_shutter = set_time * 10 * sys_clk / HTS;	
+
+	
+	pr_err("%s set_shutter = %d\n", __func__, set_time);
+	if(set_time < (ov2685_VTS - 8)){		
+		VTS = 1294;
+		
+		ov2685_set_shutter(set_time);		
+		ov2685_set_VTS(VTS);
+	}else if(set_time >= (ov2685_VTS - 8)){
+		VTS = set_time + 8;		
+		ov2685_set_VTS(VTS);
+		ov2685_set_shutter(set_time);
+	}	
+	
+	pr_err("%s set_gain = %d\n", __func__, set_gain * 16 / 10);	
+	ov2685_set_gain(set_gain * 16 / 10);
+
+
+
+	shtr3500 = ov2685_i2c_read(0x3500);
+	shtr3501 = ov2685_i2c_read(0x3501);
+	shtr3502 = ov2685_i2c_read(0x3502);
+	shtr = (shtr3500 << 12) + (shtr3501 << 4) + (shtr3502 >> 4);
+	pr_err("%s update shutter = %d\n", __func__, shtr);
+
+	gain350a = ov2685_i2c_read(0x350a);
+	gain350b = ov2685_i2c_read(0x350b);
+	gain = ((gain350a & 0x07) << 8) + (gain350b);
+	pr_err("%s update gain = %d\n", __func__, gain * 10 / 16);
+
+	aec_enable = ov2685_i2c_read(0x3503);		
+	pr_err("%s update 0x3503 = 0x%x\n", __func__, aec_enable);
+
+	return 0;
+	
+}
+
+static ssize_t ov2685_dbg_set(struct file *filp, const char __user *buffer,
+size_t count, loff_t *ppos)
+{
+	int set_time = 0;
+	int set_gain = 0;
+	int set_num = 0;
+	
+	pr_err("%s Enter. cnt=%d *ppos=%lld", __func__, (int)count, (*ppos));
+	
+	if (*ppos >= OV2685_DBG_DATA_SIZE)
+		return 0;
+	if (*ppos + count > OV2685_DBG_DATA_SIZE)
+		count = OV2685_DBG_DATA_SIZE - *ppos;
+
+	if (copy_from_user(ov2685_data_buf + *ppos, buffer, count))
+		return -EFAULT;
+	*ppos += count;
+	pr_err("ov2685_data_buf: %s \n", ov2685_data_buf);	
+
+	set_num = sscanf(ov2685_data_buf, "%d %d", &set_time, &set_gain);
+	if(2 != set_num){
+		pr_err("input format is:  echo 200 16 > ov2685_dbg. \n");
+		goto Exit;
+	}
+
+	ov2685_set_ae(set_time, set_gain);
+
+Exit:
+	pr_err("%s Exit. \n", __func__);
+
+	return count;
+}
+
+
+
+
+
+static ssize_t ov2685_dbg_read(struct file *filp, char __user *buffer,
+size_t count, loff_t *ppos)
+{
+
+	int sys_clk;
+	int HTS, VTS;
+	uint8_t aec_enable;
+	uint8_t shtr3500, shtr3501, shtr3502;
+	uint16_t shtr;
+	uint8_t gain350a,gain350b;
+	uint16_t gain;
+	int exp_time;
+
+	pr_err("%s Enter. cnt=%d *ppos=%lld\n", __func__, (int)count, (*ppos));
+
+	if (*ppos >= OV2685_DBG_DATA_SIZE)
+		return 0;
+	
+	if (*ppos + count > OV2685_DBG_DATA_SIZE)
+		count = OV2685_DBG_DATA_SIZE - *ppos;
+
+	if (copy_to_user(buffer, ov2685_data_buf + *ppos, count))
+		return -EFAULT;
+
+	*ppos += count;
+
+	pr_err("%s: %s \n", __func__, ov2685_data_buf);
+	memset(ov2685_data_buf, 0, sizeof(ov2685_data_buf));
+
+	#if 0
+	if(MSM_SENSOR_POWER_DOWN == ov2685_s_ctrl.sensor_state)	{
+		pr_err("%s fail. sensor_state=%d\n", __func__, ov2685_s_ctrl.sensor_state);
+		return 0;
+	}
+	#endif
+
+	sys_clk = ov2685_get_sysclk();
+	pr_err("%s cur sys_clk = %d\n", __func__, sys_clk);
+
+	HTS = ov2685_get_HTS();	
+	pr_err("%s cur HTS = %d\n", __func__, HTS);
+	
+	VTS = ov2685_get_VTS();
+	pr_err("%s cur VTS = %d\n", __func__, VTS);
+	
+	aec_enable = ov2685_i2c_read(0x3503);
+	
+
+	shtr3500 = ov2685_i2c_read(0x3500);
+	shtr3501 = ov2685_i2c_read(0x3501);
+	shtr3502 = ov2685_i2c_read(0x3502);
+	shtr = (shtr3500 << 12) + (shtr3501 << 4) + (shtr3502 >> 4);
+
+	pr_err("%s cur shutter = %d\n", __func__, shtr);
+
+	
+	gain350a = ov2685_i2c_read(0x350a);
+	gain350b = ov2685_i2c_read(0x350b);
+
+	gain = ((gain350a & 0x07) << 8) + (gain350b);
+	pr_err("%s cur gain = %d\n", __func__, gain * 10 / 16);
+
+    exp_time = shtr * HTS / sys_clk;
+	pr_err("%s cur exp_time = %d s\n", __func__, exp_time / 10);
+	
+	pr_err("%s Exit.\n", __func__);
+	return count;
+}
+
+
+
+
+
+struct file_operations ov2685_debug_fops = {
+.owner = THIS_MODULE,
+.open = ov2685_dbg_open,
+.read = ov2685_dbg_read,
+.write = ov2685_dbg_set,
+};
+
+
+
+
+
 static int32_t msm_ov2685_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
@@ -766,10 +1134,26 @@ static struct platform_driver ov2685_platform_driver = {
 static int __init ov2685_init_module(void)
 {
 	int32_t rc;
+	struct dentry *ov2685_dbg_entry = NULL;
+	
 	pr_info("%s:%d\n", __func__, __LINE__);
+
+	
 	rc = platform_driver_register(&ov2685_platform_driver);
-	if (!rc)
+	if (!rc){
+		ov2685_dbg_root = debugfs_create_dir("cam_dbg", NULL);
+		if (!ov2685_dbg_root){
+			pr_err("debugfs_create_dir create cam_dbg fail!\n");
+		}
+		
+		ov2685_dbg_entry = debugfs_create_file("ov2685_dbg", 0644, ov2685_dbg_root, NULL, &ov2685_debug_fops);
+		if (!ov2685_dbg_entry){
+			pr_err("debugfs_create_file create ov2685_dbg fail!\n");
+		}
+
 		return rc;
+	}
+	
 	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&ov2685_i2c_driver);
 }
@@ -1200,16 +1584,22 @@ int32_t ov2685_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 			s_ctrl->sensordata->sensor_info->is_mount_angle_valid;
 		cdata->cfg.sensor_info.sensor_mount_angle =
 			s_ctrl->sensordata->sensor_info->sensor_mount_angle;
+		cdata->cfg.sensor_info.position =
+			s_ctrl->sensordata->sensor_info->position;
+		
 		CDBG("%s:%d sensor name %s\n", __func__, __LINE__,
 			cdata->cfg.sensor_info.sensor_name);
 		CDBG("%s:%d session id %d\n", __func__, __LINE__,
 			cdata->cfg.sensor_info.session_id);
+		
 		for (i = 0; i < SUB_MODULE_MAX; i++)
 			CDBG("%s:%d subdev_id[%d] %d\n", __func__, __LINE__, i,
 				cdata->cfg.sensor_info.subdev_id[i]);
-		CDBG("%s:%d mount angle valid %d value %d\n", __func__,
+		
+		CDBG("%s:%d mount angle valid %d value %d positon %d\n", __func__,
 			__LINE__, cdata->cfg.sensor_info.is_mount_angle_valid,
-			cdata->cfg.sensor_info.sensor_mount_angle);
+			cdata->cfg.sensor_info.sensor_mount_angle,
+			cdata->cfg.sensor_info.position);
 		break;
 
 	case CFG_GET_SENSOR_INIT_PARAMS:

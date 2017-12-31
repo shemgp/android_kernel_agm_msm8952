@@ -27,14 +27,11 @@
 #define MAX_ACTUATOR_SCENARIO     8
 #define MAX_ACT_MOD_NAME_SIZE     32
 #define MAX_ACT_NAME_SIZE         32
-#define MAX_ACTUATOR_INIT_SET     2000
+#define MAX_ACTUATOR_INIT_SET     120
 #define MAX_I2C_REG_SET           12
 
 #define MAX_NAME_SIZE             32
 #define MAX_LED_TRIGGERS          3
-
-#define MSM_EEPROM_MEMORY_MAP_MAX_SIZE  80
-#define MSM_EEPROM_MAX_MEM_MAP_CNT      8
 
 enum msm_sensor_camera_id_t {
 	CAMERA_0,
@@ -167,7 +164,6 @@ enum actuator_type {
 	ACTUATOR_PIEZO,
 	ACTUATOR_HVCM,
 	ACTUATOR_BIVCM,
-	ACTUATOR_VCM2,
 };
 
 enum msm_flash_driver_type {
@@ -208,38 +204,12 @@ struct msm_sensor_power_setting_array {
 	unsigned short size_down;
 };
 
-enum msm_camera_i2c_operation {
-	MSM_CAM_WRITE = 0,
-	MSM_CAM_POLL,
-	MSM_CAM_READ,
-};
 
 struct msm_sensor_i2c_sync_params {
 	unsigned int cid;
 	int csid;
 	unsigned short line;
 	unsigned short delay;
-};
-
-struct msm_camera_reg_settings_t {
-	uint16_t reg_addr;
-	enum msm_camera_i2c_reg_addr_type addr_type;
-	uint16_t reg_data;
-	enum msm_camera_i2c_data_type data_type;
-	enum msm_camera_i2c_operation i2c_operation;
-	uint16_t delay;
-};
-
-struct msm_eeprom_mem_map_t {
-	int slave_addr;
-	struct msm_camera_reg_settings_t
-		mem_settings[MSM_EEPROM_MEMORY_MAP_MAX_SIZE];
-	int memory_map_size;
-};
-
-struct msm_eeprom_memory_map_array {
-	struct msm_eeprom_mem_map_t memory_map[MSM_EEPROM_MAX_MEM_MAP_CNT];
-	uint32_t msm_size_of_max_mappings;
 };
 
 struct msm_sensor_init_params {
@@ -271,6 +241,7 @@ struct msm_camera_sensor_slave_info {
 	struct msm_sensor_power_setting_array power_setting_array;
 	unsigned char  is_init_params_valid;
 	struct msm_sensor_init_params sensor_init_params;
+	unsigned char is_flash_supported;
 	enum msm_sensor_output_format_t output_format;
 };
 
